@@ -28,6 +28,7 @@
 #include "partition.cpp"
 #include "GradientDescent.cpp"
 #include "GradientDescentOneDim.cpp"
+#include "RecursiveClustering.cpp"
 
 bool was[1000000];
 
@@ -59,11 +60,14 @@ void runMany(int solutionNumber, const string& fileName, const string& name, con
     for (int i = 0; i < solutionNumber; i++) {
       measureTime(to_string(i) + "-th iteration", [&]() {
         Partition partition = solve();
+        // Enforce balance
+        partition.fixPartition();
         assert(partition.check());
 #pragma omp critical
         {
           double val = objective(partition);
           out << val << " ";
+          out.flush();
           partitions.emplace_back(val, partition);
           for (int u = 0; u < g.n; u++) {
             outs[u] = static_cast<char> ('0' + partition.map[u]);
@@ -72,7 +76,6 @@ void runMany(int solutionNumber, const string& fileName, const string& name, con
           partitionFile.flush();
           cerr << endl << i << "-th res = ";
           printRes(partition, g, val, cerr);
-          cerr << i << "-th iteration clock ";
         }
       });
     }
@@ -95,7 +98,29 @@ std::function<double (const Partition&)> cut(const Graph& g) {
 
 void gradientDescent(const Graph &g, double eps, int solutionNumber, double step, const string& fileName) {
   runMany(solutionNumber, fileName, "Grad", g, cut(g), [&] {
-    return GradientDescentOneDim(step).apply(g, eps);
+    return GradientDescentOneDim(step).apply(g, eps, 0.5);
+  });
+}
+
+void gradientDescentManyParts(const Graph &g, double eps, int solutionNumber, double step, int k, const string& fileName) {
+  runMany(solutionNumber, fileName, "Grad", g, cut(g), [&] {
+    vector<tuple<int, double> > cuts;
+    auto res = RecursiveClustering::apply(g, eps / 4.5, step, k, cuts);
+    get<0>(cuts[0])++;
+    for (int i = 0; i < (int)cuts.size() - 1; ++i) {
+      get<0>(cuts[i+1]) += get<0>(cuts[i]);
+      get<1>(cuts[i+1]) += get<1>(cuts[i]);
+    }
+    cerr << "Cuts for the corresponding cluster count: ";
+    double edgeCount = 0;
+    for (int i = 0; i < g.n; ++i) {
+      edgeCount += g.g[i].size();
+    }
+    edgeCount /= 2;
+    for (auto cut : cuts)
+      cerr << "[" << get<0>(cut) << ": " << get<1>(cut) << " (" << (int)(10000. * get<1>(cut) / edgeCount) / 100. << "%)] ";
+    cerr << endl;
+    return res;
   });
 }
 
@@ -168,7 +193,8 @@ int main(int argc, char** argv) {
       cerr << name << ": " << endl;
       Graph g = Graph::read(getPath(name));
       string fileName = dir + "/" + name;
-      gradientDescent(g, 0.01, 3, 0.001, fileName);
+//      gradientDescent(g, 0.01, 3, 0.0005, fileName);
+      gradientDescentManyParts(g, 0.01, 3, 0.0005, 20, fileName);
       out.flush();
     }
   });

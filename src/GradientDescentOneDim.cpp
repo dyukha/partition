@@ -69,14 +69,17 @@ protected:
     return dif;
   }
 
-  void project(double eps) override {
-    double imbalance = n * eps;
-
+  void project(double eps, double proportion) override {
+    double idealSum = - n * proportion + n * (1 - proportion);
     double sum = 0;
     for (int u = 0; u < n; ++u)
       sum += p[u];
+    sum -= idealSum;
     double dif = getDif(0);
     double lam;
+    double imbalance = n * eps;
+    // dif = initSum - resSum
+    // We want resSum = idealSum => dif = initSum - resSum
     if (abs(dif - sum) < imbalance + n * 0.001) {
       lam = 0;
     } else {
@@ -104,10 +107,9 @@ protected:
       p[u] = roundCube(p[u] - lam);
     // check
     sum = 0;
-    for (int i = 0; i < n; ++i) {
+    for (int i = 0; i < n; ++i)
       sum += p[i];
-    }
-    assert(abs(sum) < n * (eps + 0.002));
+    assert(abs(sum - idealSum) < n * (eps + 0.002));
   }
 
 };

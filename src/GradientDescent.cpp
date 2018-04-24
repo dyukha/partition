@@ -30,7 +30,9 @@
 
 class GradientDescent {
 public:
-  Partition apply(const Graph &g, double eps) {
+  /// Partition graph g with imbalance eps.
+  /// Can split into not-equal sizes, as defined by proportion parameter.
+  Partition apply(const Graph &g, double eps, double proportion) {
     // inner imbalance
     eps *= 0.95;
     n = g.n;
@@ -39,11 +41,12 @@ public:
     grad = vector<double>(n);
 
     for (int i = 0; i < n; i++)
-      p[i] = 0.01 * (2 * Rand::nextRand() - 1);
+      p[i] = 0.02 * (Rand::nextRand() - 1 + proportion);
     cerr << "Objective each 10 iterations: ";
+    project(eps, proportion);
 
     for (int iter = 0; ; iter++) {
-      if (iter % 10 == 0 && (isFinished(g) && iter > 50)) // The strange order to output cut
+      if (iter % 10 == 0 && (isFinished(g) && iter >= 100)) // The strange order to output cut
         break;
       computeGradient(g);
       double stepSize = step(iter);
@@ -52,7 +55,7 @@ public:
         prevP[u] = p[u];
         p[u] += grad[u] * stepSize;
       }
-      project(eps);
+      project(eps, proportion);
 #pragma omp parallel for
       for (int u = 0; u < n; ++u) {
         if ((p[u] > -1 && p[u] < 1) || abs(p[u] - prevP[u]) > 0.01) {
@@ -62,11 +65,10 @@ public:
         }
       }
     }
+    cerr << endl;
     Partition part(n, 2, eps);
     for (int u = 0; u < n; u++)
       part.move(u, Rand::check(0.5 * (1 + p[u])) ? 1 : 0);
-    // Enforce balance
-    part.fixPartition();
     return part;
   }
 
@@ -78,7 +80,7 @@ protected:
   /// Probabilistic cut
   virtual double cut(const Graph &g) = 0;
   /// Projection function. The argument is imbalance
-  virtual void project(double eps) = 0;
+  virtual void project(double eps, double proportion) = 0;
 
   /// Array of probabilities
   vector<double> p;
