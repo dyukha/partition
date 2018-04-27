@@ -31,7 +31,7 @@
 
 class GradientDescentManyClusters {
 public:
-  GradientDescentManyClusters(double stepSize) : stepSize(stepSize) {}
+  GradientDescentManyClusters(double stepSize, size_t numThreads) : stepSize(stepSize), numThreads(numThreads) {}
 
 /// Partition graph g with imbalance eps.
   /// Can split into not-equal sizes, as defined by proportion parameter.
@@ -59,16 +59,14 @@ public:
         break;
       computeGradient(g);
       double stepSize = step(iter);
-#pragma omp parallel for
-      for (int u = 0; u < n; ++u) {
+      parallel_for(numThreads, 0, n, [&](int u) {
         for (int j = 0; j < k; ++j) {
           prevP[u][j] = p[u][j];
           p[u][j] += grad[u][j] * stepSize;
         }
-      }
+      });
       project(eps);
-#pragma omp parallel for
-      for (int u = 0; u < n; ++u) {
+      parallel_for(numThreads, 0, n, [&](int u) {
         for (int j = 0; j < k; ++j) {
           if ((p[u][j] > 0 && p[u][j] < 1) || abs(p[u][j] - prevP[u][j]) > 0.01) {
             double dif = p[u][j] - prevP[u][j];
@@ -76,7 +74,7 @@ public:
               grad[v][j] += dif;
           }
         }
-      }
+      });
     }
     cerr << endl;
     Partition part(n, k, eps);
@@ -100,51 +98,47 @@ protected:
   }
   /// Gradient computation function
   void computeGradient(const Graph &g) {
-#pragma omp parallel for
-    for (int u = 0; u < n; ++u) {
+    parallel_for(numThreads, 0, n, [&](int u) {
       for (int j = 0; j < k; ++j) {
         double res = 0;
         for (int v : g.g[u])
           res += p[v][j];
         grad[u][j] = res;
       }
-    }
+    });
   }
   /// Probabilistic cut
   double cut(const Graph &g) {
-    double res = 0;
-#pragma omp parallel for reduction(+:res)
-    for (int u = 0; u < n; ++u) {
-      double locRes = g.g[u].size();
-      for (int j = 0; j < k; ++j)
-        for (int v : g.g[u])
-          locRes -= p[u][j] * p[v][j];
-      res += locRes;
-    }
+    double res =
+            parallel_sum(numThreads, 0, n, [&](int u) {
+              double locRes = g.g[u].size();
+              for (int j = 0; j < k; ++j)
+                for (int v : g.g[u])
+                  locRes -= p[u][j] * p[v][j];
+              return locRes;
+            });
     return res;
   }
   /// Projection function. The argument is imbalance
   void project(double) {
     int n = p.size();
     for (int it = 0; it < 5; it++) {
-#pragma omp parallel for
-      for (int j = 0; j < k; ++j) {
+      parallel_for(numThreads, 0, k, [&](int j) {
         double sum = 0;
         for (int u = 0; u < n; ++u)
           sum += p[u][j];
         double dif = (sum - n / (double)k) / n;
         for (int u = 0; u < n; ++u)
           p[u][j] -= dif;
-      }
-#pragma omp parallel for
-      for (int u = 0; u < n; ++u) {
+      });
+      parallel_for(numThreads, 0, n, [&](int u) {
         double sum = 0;
         for (int j = 0; j < k; ++j)
           sum += p[u][j];
         double dif = (sum - 1) / k;
         for (int j = 0; j < k; ++j)
           p[u][j] = Projections::roundCube(p[u][j] - dif);
-      }
+      });
     }
   }
 
@@ -171,6 +165,7 @@ protected:
   }
 
   double stepSize;
+  size_t numThreads;
 };
 
 #endif

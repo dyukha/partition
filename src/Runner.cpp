@@ -106,7 +106,7 @@ void gradientDescent(const Graph &g, double eps, int solutionNumber, double step
 
 void gradientDescentManyPartsSimultanious(const Graph &g, double eps, int solutionNumber, double step, int k, const string& fileName) {
   runMany(solutionNumber, fileName, "Grad", g, cut(g), [&] {
-    return GradientDescentManyClusters(step).apply(g, eps, k);
+    return GradientDescentManyClusters(step, 8).apply(g, eps, k);
   });
 }
 
