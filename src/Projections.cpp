@@ -45,7 +45,7 @@ struct Projections {
 
 
   static inline double roundCube(double v) {
-    return max(-1.0, min(1.0, v));
+    return max(0.0, min(1.0, v));
   }
 
   static double getDif(const vector<double>& p, double lam) {
