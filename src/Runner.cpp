@@ -25,10 +25,11 @@
 
 #include "utils.cpp"
 #include "Graph.cpp"
-#include "partition.cpp"
+#include "Partition.cpp"
 #include "GradientDescent.cpp"
-#include "GradientDescentOneDim.cpp"
+#include "GradientDescentImpl.cpp"
 #include "RecursiveClustering.cpp"
+#include "Projections.cpp"
 
 bool was[1000000];
 
@@ -98,7 +99,7 @@ std::function<double (const Partition&)> cut(const Graph& g) {
 
 void gradientDescent(const Graph &g, double eps, int solutionNumber, double step, const string& fileName) {
   runMany(solutionNumber, fileName, "Grad", g, cut(g), [&] {
-    return GradientDescentOneDim(step).apply(g, eps, 0.5);
+    return GradientDescentImpl(step, Projections::presize).apply(g, eps, 0.5);
   });
 }
 
@@ -194,7 +195,7 @@ int main(int argc, char** argv) {
       Graph g = Graph::read(getPath(name));
       string fileName = dir + "/" + name;
 //      gradientDescent(g, 0.01, 3, 0.0005, fileName);
-      gradientDescentManyParts(g, 0.01, 3, 0.0005, 20, fileName);
+      gradientDescentManyParts(g, 0.01, 3, 0.0003, 20, fileName);
       out.flush();
     }
   });

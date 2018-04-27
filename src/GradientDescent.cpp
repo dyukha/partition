@@ -26,7 +26,7 @@
 #include <omp.h>
 #include "utils.cpp"
 #include "Graph.cpp"
-#include "partition.cpp"
+#include "Partition.cpp"
 
 class GradientDescent {
 public:
@@ -46,7 +46,7 @@ public:
     project(eps, proportion);
 
     for (int iter = 0; ; iter++) {
-      if (iter % 10 == 0 && (isFinished(g) && iter >= 100)) // The strange order to output cut
+      if (iter % 10 == 0 && (isFinished(g) && iter >= 200)) // The strange order to output cut
         break;
       computeGradient(g);
       double stepSize = step(iter);

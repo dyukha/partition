@@ -24,8 +24,9 @@
 */
 
 #include "utils.cpp"
-#include "partition.cpp"
-#include "GradientDescentOneDim.cpp"
+#include "Partition.cpp"
+#include "GradientDescentImpl.cpp"
+#include "Projections.cpp"
 
 struct RecursiveClustering {
   static Partition apply (const Graph& g, double eps, double step, int k, vector<tuple<int, double>>& cuts, int depth = 0) {
@@ -35,7 +36,7 @@ struct RecursiveClustering {
     // Left corresponds to 0, right - to 1
     vector<int> sz = { k/2, k - k/2 };
     cerr << "n = " << g.n <<"; k = " << k << endl;
-    Partition split = GradientDescentOneDim(step).apply(g, eps, sz[0] * 1.0 / k);
+    Partition split = GradientDescentImpl(step, Projections::simple).apply(g, eps, sz[0] * 1.0 / k);
     double cut = split.cut(g);
     while (cuts.size() <= depth)
       cuts.emplace_back(0, 0);

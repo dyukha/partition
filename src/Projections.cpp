@@ -1,5 +1,5 @@
-#ifndef GRADIENT_DESCENT_ONE_DIM_CPP
-#define GRADIENT_DESCENT_ONE_DIM_CPP
+#ifndef PROJECTIONS_CPP
+#define PROJECTIONS_CPP
 
 /*
   Copyright (c) 2018 Dmitrii Avdiukhin
@@ -23,45 +23,33 @@
   SOFTWARE.
 */
 
-#include "GradientDescent.cpp"
+#include "utils.cpp"
 
-class GradientDescentOneDim : public GradientDescent {
-  double stepSize;
-public:
-  explicit GradientDescentOneDim(double stepSize) : stepSize(stepSize) {}
-
-protected:
-
-  double step(int) override {
-    return stepSize;
-  }
-
-  void computeGradient(const Graph &g) override {
-#pragma omp parallel for
-    for (int u = 0; u < n; u++) {
-      grad[u] = 0;
-      for (int v : g.g[u])
-        grad[u] += p[v];
-    }
-  }
-
-  double cut(const Graph &g) override {
-    double val = 0;
-#pragma omp parallel for reduction(+:val)
-    for (int u = 0; u < n; ++u) {
+struct Projections {
+  static void simple(vector<double>& p, double eps, double proportion) {
+    int n = p.size();
+    double idealSum = - n * proportion + n * (1 - proportion);
+    for (int i = 0; i < 5; i++) {
       double sum = 0;
-      for (int v : g.g[u])
-        sum += p[u] * p[v];
-      val += (g.g[u].size() - sum);
+#pragma omp parallel for reduction(+:sum)
+      for (int u = 0; u < n; ++u)
+        sum += p[u];
+      double dif = (sum - idealSum) / n;
+      if (abs(dif) < eps)
+        return;
+#pragma omp parallel for
+      for (int u = 0; u < n; ++u)
+        p[u] = roundCube(p[u] - dif);
     }
-    return val / 4;
   }
 
-  inline double roundCube(double p) {
-    return max(-1.0, min(1.0, p));
+
+  static inline double roundCube(double v) {
+    return max(-1.0, min(1.0, v));
   }
 
-  double getDif(double lam) {
+  static double getDif(const vector<double>& p, double lam) {
+    int n = p.size();
     double dif = 0;
 #pragma omp parallel for reduction(+ : dif)
     for (int u = 0; u < n; ++u)
@@ -69,13 +57,14 @@ protected:
     return dif;
   }
 
-  void project(double eps, double proportion) override {
+  static void presize(vector<double>& p, double eps, double proportion) {
+    int n = p.size();
     double idealSum = - n * proportion + n * (1 - proportion);
     double sum = 0;
     for (int u = 0; u < n; ++u)
       sum += p[u];
     sum -= idealSum;
-    double dif = getDif(0);
+    double dif = getDif(p, 0);
     double lam;
     double imbalance = n * eps;
     // dif = initSum - resSum
@@ -91,7 +80,7 @@ protected:
       double cmp = dif < sum ? sum - imbalance : sum + imbalance;
       for (int it = 0; it < 30; ++it) {
         double lam = (left + right) / 2;
-        double dif = getDif(lam);
+        double dif = getDif(p, lam);
         if (abs(dif - cmp) < n * 0.001)
           break;
         if (dif > cmp) {
@@ -111,7 +100,6 @@ protected:
       sum += p[i];
     assert(abs(sum - idealSum) < n * (eps + 0.002));
   }
-
 };
 
 #endif
