@@ -53,9 +53,11 @@ struct RecursiveClustering {
       for (int v : g.g[u])
         if (u < v && split.map[u] == split.map[v])
           edges[split.map[u]].emplace_back(map[u], map[v]);
-    vector<Partition> part;
-    for (int t = 0; t < 2; ++t)
-      part.push_back(apply(Graph(cnt[t], edges[t]), eps, step, sz[t], cuts, depth+1));
+    vector<Partition> part(2);
+//#pragma omp parallel for
+    for (int t = 0; t < 2; ++t) {
+      part[t] = apply(Graph(cnt[t], edges[t]), eps, step, sz[t], cuts, depth+1);
+    }
     Partition res(n, k, eps * 4.5);
     for (int i = 0; i < n; ++i) {
       int p = split.map[i] * sz[0] + part[split.map[i]].map[map[i]];

@@ -203,7 +203,7 @@ int main(int argc, char** argv) {
       string fileName = dir + "/" + name;
 //      gradientDescent(g, 0.01, 3, 0.0005, fileName);
 //      gradientDescentManyParts(g, 0.01, 3, 0.0003, 20, fileName);
-      gradientDescentManyPartsSimultanious(g, 0.01, 3, 0.001, 20, fileName);
+      gradientDescentManyPartsSimultanious(g, 0.03, 3, 0.0003, 20, fileName);
       out.flush();
     }
   });

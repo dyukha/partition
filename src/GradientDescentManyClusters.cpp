@@ -30,8 +30,10 @@
 #include "Projections.cpp"
 
 class GradientDescentManyClusters {
+
 public:
-  GradientDescentManyClusters(double stepSize) : stepSize(stepSize) {}
+  GradientDescentManyClusters(double stepSize) : stepSize(stepSize) {
+  }
 
 /// Partition graph g with imbalance eps.
   /// Can split into not-equal sizes, as defined by proportion parameter.
@@ -50,29 +52,29 @@ public:
 
     for (int i = 0; i < n; i++)
       for (int j = 0; j < k; ++j)
-        p[i][j] = 1. / k + 0.01 * (Rand::nextRand() - 0.5);
+        prevP[i][j] = p[i][j] = 1. / k + 0.01 * (Rand::nextRand() - 0.5);
     cerr << "Objective each 10 iterations: ";
     project(eps);
 
     for (int iter = 0; ; iter++) {
       if (iter % 10 == 0 && (isFinished(g) && iter >= 200)) // The strange order to output cut
         break;
-      computeGradient(g);
+      if (iter % 10 == 0)
+        computeGradient(g);
       double stepSize = step(iter);
 #pragma omp parallel for
-      for (int u = 0; u < n; ++u) {
-        for (int j = 0; j < k; ++j) {
-          prevP[u][j] = p[u][j];
+      for (int u = 0; u < n; ++u)
+        for (int j = 0; j < k; ++j)
           p[u][j] += grad[u][j] * stepSize;
-        }
-      }
       project(eps);
 #pragma omp parallel for
       for (int u = 0; u < n; ++u) {
         for (int j = 0; j < k; ++j) {
-          if ((p[u][j] > 0 && p[u][j] < 1) || abs(p[u][j] - prevP[u][j]) > 0.01) {
+          if (abs(p[u][j] - prevP[u][j]) > 0.01) {
             double dif = p[u][j] - prevP[u][j];
+            prevP[u][j] = p[u][j];
             for (auto v : g.g[u])
+#pragma omp atomic
               grad[v][j] += dif;
           }
         }
@@ -95,8 +97,8 @@ public:
 
 protected:
   /// Step size (depending on the iteration).
-  inline double step(int) {
-    return stepSize;
+  inline double step(int iteration) {
+    return iteration < 400 ? stepSize * 10 : stepSize;
   }
   /// Gradient computation function
   void computeGradient(const Graph &g) {
@@ -119,23 +121,31 @@ protected:
       for (int j = 0; j < k; ++j)
         for (int v : g.g[u])
           locRes -= p[u][j] * p[v][j];
-      res += locRes;
+      res += locRes / 2;
     }
     return res;
   }
   /// Projection function. The argument is imbalance
   void project(double) {
     int n = p.size();
-    for (int it = 0; it < 5; it++) {
+    for (int it = 0; it < 10; it++) {
+      double* sum = new double[k];
+      vector<double> dif(k);
+      for (int i = 0; i < k; i++)
+        sum[i] = 0;
+      // because of some problem (memory, I guess) it's muc more efficietn to reverse loops order
+#pragma omp parallel for reduction(+:sum[:k])
+      for (int u = 0; u < n; ++u)
+        for (int j = 0; j < k; ++j)
+          sum[j] += p[u][j];
+      
+      for (int i = 0; i < k; i++)
+        dif[i] = (sum[i] - n / (double)k) / n;
 #pragma omp parallel for
-      for (int j = 0; j < k; ++j) {
-        double sum = 0;
-        for (int u = 0; u < n; ++u)
-          sum += p[u][j];
-        double dif = (sum - n / (double)k) / n;
-        for (int u = 0; u < n; ++u)
-          p[u][j] -= dif;
-      }
+      for (int u = 0; u < n; ++u)
+        for (int j = 0; j < k; j++)
+          p[u][j] -= dif[j];
+      
 #pragma omp parallel for
       for (int u = 0; u < n; ++u) {
         double sum = 0;
@@ -145,6 +155,7 @@ protected:
         for (int j = 0; j < k; ++j)
           p[u][j] = Projections::roundCube(p[u][j] - dif);
       }
+      delete[] sum;
     }
   }
 

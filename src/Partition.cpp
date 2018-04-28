@@ -35,6 +35,8 @@ struct Partition {
   vector<int> pos;
   int n, k, upperBound, lowerBound;
 
+  Partition() {}
+
   Partition(const Partition &other) = default;
 
   Partition(int n, int k, double eps) : n(n), k(k) {
