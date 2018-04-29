@@ -129,6 +129,15 @@ protected:
   void project(double) {
     int n = p.size();
     for (int it = 0; it < 10; it++) {
+#pragma omp parallel for
+      for (int u = 0; u < n; ++u) {
+        double sum = 0;
+        for (int j = 0; j < k; ++j)
+          sum += p[u][j];
+        double dif = (sum - 1) / k;
+        for (int j = 0; j < k; ++j)
+          p[u][j] = Projections::roundCube(p[u][j] - dif);
+      }
       double* sum = new double[k];
       vector<double> dif(k);
       for (int i = 0; i < k; i++)
@@ -145,18 +154,8 @@ protected:
       for (int u = 0; u < n; ++u)
         for (int j = 0; j < k; j++)
           p[u][j] -= dif[j];
-      
-#pragma omp parallel for
-      for (int u = 0; u < n; ++u) {
-        double sum = 0;
-        for (int j = 0; j < k; ++j)
-          sum += p[u][j];
-        double dif = (sum - 1) / k;
-        for (int j = 0; j < k; ++j)
-          p[u][j] = Projections::roundCube(p[u][j] - dif);
-      }
       delete[] sum;
-    }
+   }
   }
 
   /// Array of probabilities
