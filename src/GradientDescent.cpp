@@ -40,27 +40,32 @@ public:
     prevP = vector<double>(n);
     grad = vector<double>(n);
 
-    for (int i = 0; i < n; i++)
+    for (int i = 0; i < n; i++) {
       p[i] = 0.02 * (Rand::nextRand() - 1 + proportion);
+      prevP[i] = p[i];
+    }
     cerr << "Objective each 10 iterations: ";
     project(eps, proportion);
 
+    computeGradient(g);
     for (int iter = 0; ; iter++) {
       if (iter % 10 == 0 && (isFinished(g) && iter >= 500)) // The strange order to output cut
         break;
-      computeGradient(g);
+      if (iter % 20 == 0)
+        computeGradient(g);
       double stepSize = step(iter);
 #pragma omp parallel for
       for (int u = 0; u < n; ++u) {
-        prevP[u] = p[u];
         p[u] += grad[u] * stepSize;
       }
       project(eps, proportion);
 #pragma omp parallel for
       for (int u = 0; u < n; ++u) {
-        if ((p[u] > -1 && p[u] < 1) || abs(p[u] - prevP[u]) > 0.01) {
+        if (abs(p[u] - prevP[u]) > 0.01) {
           double dif = p[u] - prevP[u];
+          prevP[u] = p[u];
           for (auto v : g.g[u])
+#pragma omp atomic
             grad[v] += dif;
         }
       }

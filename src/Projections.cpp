@@ -60,6 +60,7 @@ struct Projections {
     int n = p.size();
     double idealSum = - n * proportion + n * (1 - proportion);
     double sum = 0;
+#pragma omp parallel for reduction(+:sum)
     for (int u = 0; u < n; ++u)
       sum += p[u];
     sum -= idealSum;
@@ -95,6 +96,7 @@ struct Projections {
       p[u] = roundCube(p[u] - lam);
     // check
     sum = 0;
+#pragma omp parallel for reduction(+: sum)
     for (int i = 0; i < n; ++i)
       sum += p[i];
     assert(abs(sum - idealSum) < n * (eps + 0.002));
@@ -170,12 +172,14 @@ struct Projections {
   static void precise2D(vector<double>& p, double eps, const vector<double>& w1, const vector<double>& w2) {
     int n = p.size();
     double sum1 = 0, sum2 = 0;
+#pragma omp parallel for reduction(+: sum1,sum2)
     for (int u = 0; u < n; ++u) {
       sum1 += w1[u] * p[u];
       sum2 += w2[u] * p[u];
     }
 //    cerr << "(" << sum1 << ", " << sum2 << ") ";
     double imb1 = 0, imb2 = 0;
+#pragma omp parallel for reduction(+: imb1,imb2)
     for (int u = 0; u < n; u++) {
       imb1 += w1[u];
       imb2 += w2[u];
@@ -222,6 +226,7 @@ struct Projections {
       p[u] = roundCube(p[u] - (w1[u] * lam1 + w2[u] * lam2));
     // check
     sum1 = sum2 = 0;
+#pragma omp parallel for reduction(+: sum1,sum2)
     for (int u = 0; u < n; ++u) {
       sum1 += w1[u] * p[u];
       sum2 += w2[u] * p[u];
