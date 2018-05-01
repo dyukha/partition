@@ -46,7 +46,7 @@ public:
     project(eps, proportion);
 
     for (int iter = 0; ; iter++) {
-      if (iter % 10 == 0 && (isFinished(g) && iter >= 200)) // The strange order to output cut
+      if (iter % 10 == 0 && (isFinished(g) && iter >= 500)) // The strange order to output cut
         break;
       computeGradient(g);
       double stepSize = step(iter);

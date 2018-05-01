@@ -136,7 +136,7 @@ protected:
           sum += p[u][j];
         double dif = (sum - 1) / k;
         for (int j = 0; j < k; ++j)
-          p[u][j] = Projections::roundCube(p[u][j] - dif);
+          p[u][j] = max(0.0, min(1.0, p[u][j] - dif));
       }
       double* sum = new double[k];
       vector<double> dif(k);

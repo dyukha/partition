@@ -94,4 +94,8 @@ void createDir(const string& dir) {
   #endif
 }
 
+inline int sign(double x) {
+  return x < -1e-9 ? -1 : (x > 1e-9 ? 1 : 0);
+}
+
 #endif
