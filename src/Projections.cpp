@@ -250,7 +250,9 @@ struct Projections {
       double sum = 0;
 #pragma omp parallel for reduction(+: sum)
       for (int u = 0; u < n; ++u) {
-        sum += p[u] - incPlane[u];
+        p[u] -= incPlane[u];
+        incPlane[u] = 0;
+        sum += p[u];
       }
       double dif = sum / n;
       if (abs(dif) <= eps)
@@ -258,7 +260,7 @@ struct Projections {
       dif = sign(dif) * (abs(dif) - eps);
 #pragma omp parallel for
       for (int u = 0; u < n; ++u) {
-        double newP = p[u] - incPlane[u] - dif;
+        double newP = p[u] - dif;
         incPlane[u] = newP - p[u];
         p[u] = newP;
       }
