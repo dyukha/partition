@@ -61,7 +61,7 @@ public:
       project(eps, proportion);
 #pragma omp parallel for
       for (int u = 0; u < n; ++u) {
-        if (abs(p[u] - prevP[u]) > 0.01) {
+        if (abs(p[u] - prevP[u]) > 1e-6) {
           double dif = p[u] - prevP[u];
           prevP[u] = p[u];
           for (auto v : g.g[u])

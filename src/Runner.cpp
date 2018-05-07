@@ -99,7 +99,9 @@ std::function<double (const Partition&)> cut(const Graph& g) {
 
 void gradientDescent(const Graph &g, double eps, int solutionNumber, double step, const string& fileName) {
   runMany(solutionNumber, fileName, "Grad", g, cut(g), [&] {
-    return GradientDescentImpl(step, Projections::presize).apply(g, eps, 0.5);
+//    return GradientDescentImpl(step, Projections::presize).apply(g, eps, 0.5);
+//    return GradientDescentImpl(step, Projections::simple).apply(g, eps, 0.5);
+    return GradientDescentImpl(step, Projections::dykstra).apply(g, eps, 0.5);
   });
 }
 
@@ -111,7 +113,8 @@ void gradientDescent2D(const Graph &g, double eps, int solutionNumber, double st
     w2[i] = g.g[i].size();
   }
   runMany(solutionNumber, fileName, "Grad", g, cut(g), [&] {
-    return GradientDescentImpl(step, [&](vector<double>& p, double eps, double) {return Projections::precise2D(p, eps, w1, w2); }).apply(g, eps, 0.5);
+//    return GradientDescentImpl(step, [&](vector<double>& p, double eps, double) {return Projections::precise2D(p, eps, w1, w2); }).apply(g, eps, 0.5);
+    return GradientDescentImpl(step, [&](vector<double>& p, double eps, double) {return Projections::dykstra2D(p, eps, w1, w2); }).apply(g, eps, 0.5);
   });
 }
 
