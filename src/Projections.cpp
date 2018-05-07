@@ -41,6 +41,56 @@ struct Projections {
     }
   }
 
+  static void simple2D(vector<double>& p, double eps, vector<double>& w1, vector<double>& w2) {
+    int n = p.size();
+    double total1 = 0, total2 = 0;
+    double lenSq1 = 0, lenSq2 = 0; // Since w1 and w2 don't have length 1, we need to take their length into account. This can be avoided by scaling
+#pragma omp parallel for reduction(+: total1,total2,lenSq1,lenSq2)
+    for (int u = 0; u < n; u++) {
+      total1 += w1[u];
+      total2 += w2[u];
+      lenSq1 += w1[u] * w1[u];
+      lenSq2 += w2[u] * w2[u];
+    }
+    double imb1 = total1 * eps, imb2 = total2 * eps;
+    for (int it = 0; it < 5; ++it) {
+      double sum1 = 0;
+#pragma omp parallel for reduction(+: sum1)
+      for (int u = 0; u < n; ++u) {
+        sum1 += w1[u] * p[u];
+      }
+      double dif1 = sum1 / lenSq1;
+#pragma omp parallel for
+      for (int u = 0; u < n; ++u) {
+        p[u] -= w1[u] * dif1;
+      }
+      double sum2 = 0;
+#pragma omp parallel for reduction(+: sum2)
+      for (int u = 0; u < n; ++u) {
+        sum2 += w2[u] * p[u];
+      }
+      double dif2 = sum2 / lenSq2;
+#pragma omp parallel for
+      for (int u = 0; u < n; ++u) {
+        p[u] -= w2[u] * dif2;
+      }
+#pragma omp parallel for
+      for (int u = 0; u < n; ++u) {
+        p[u] = roundCube(p[u]);
+      }
+    }
+    double sum1 = 0, sum2 = 0;
+#pragma omp parallel for reduction(+: sum1,sum2)
+    for (int u = 0; u < n; ++u) {
+      sum1 += w1[u] * p[u];
+      sum2 += w2[u] * p[u];
+    }
+    if (abs(sum1) > imb1 * 1.1)
+      cerr << sum1 / total1 << "! ";
+    if (abs(sum2) > imb2 * 1.1)
+      cerr << sum2 / total2 << "!! ";
+  }
+
   static inline double roundCube(double v) {
     return max(-1.0, min(1.0, v));
   }
@@ -54,7 +104,7 @@ struct Projections {
     return dif;
   }
 
-  static void presize(vector<double>& p, double eps, double proportion) {
+  static void precise(vector<double>& p, double eps, double proportion) {
     int n = p.size();
     double idealSum = - n * proportion + n * (1 - proportion);
     double sum = 0;
@@ -283,22 +333,16 @@ struct Projections {
     vector<double> incCube(n), incPlane1(n), incPlane2(n);
 //    cerr << "(" << sum1 << ", " << sum2 << ") ";
     double total1 = 0, total2 = 0;
-    double len1 = 0, len2 = 0;
-#pragma omp parallel for reduction(+: total1,total2,len1,len2)
+    double lenSq1 = 0, lenSq2 = 0;
+#pragma omp parallel for reduction(+: total1,total2,lenSq1,lenSq2)
     for (int u = 0; u < n; u++) {
       total1 += w1[u];
       total2 += w2[u];
-      len1 += w1[u] * w1[u];
-      len2 += w2[u] * w2[u];
+      lenSq1 += w1[u] * w1[u];
+      lenSq2 += w2[u] * w2[u];
     }
     double imb1 = total1 * eps, imb2 = total2 * eps;
     for (int it = 0; it < 5; ++it) {
-#pragma omp parallel for
-      for (int u = 0; u < n; ++u) {
-        double newP = roundCube(p[u] - incCube[u]);
-        incCube[u] = newP - p[u];
-        p[u] = newP;
-      }
       double sum1 = 0;
 #pragma omp parallel for reduction(+: sum1)
       for (int u = 0; u < n; ++u) {
@@ -307,7 +351,7 @@ struct Projections {
         sum1 += w1[u] * p[u];
       }
       if (abs(sum1) > imb1) {
-        double dif1 = sign(sum1) * (abs(sum1) - imb1) / len1;
+        double dif1 = sign(sum1) * (abs(sum1) - imb1) / lenSq1;
 #pragma omp parallel for
         for (int u = 0; u < n; ++u) {
           double newP = p[u] - w1[u] * dif1;
@@ -323,7 +367,7 @@ struct Projections {
         sum2 += w2[u] * p[u];
       }
       if (abs(sum2) > imb2) {
-        double dif2 = sign(sum2) * (abs(sum2) - imb2) / len2;
+        double dif2 = sign(sum2) * (abs(sum2) - imb2) / lenSq2;
 #pragma omp parallel for
         for (int u = 0; u < n; ++u) {
           double newP = p[u] - w2[u] * dif2;
@@ -331,10 +375,12 @@ struct Projections {
           p[u] = newP;
         }
       }
-    }
 #pragma omp parallel for
-    for (int u = 0; u < n; ++u) {
-      p[u] = roundCube(p[u] - incCube[u]);
+      for (int u = 0; u < n; ++u) {
+        double newP = roundCube(p[u] - incCube[u]);
+        incCube[u] = newP - p[u];
+        p[u] = newP;
+      }
     }
     double sum1 = 0, sum2 = 0;
 #pragma omp parallel for reduction(+: sum1,sum2)
@@ -343,9 +389,9 @@ struct Projections {
       sum2 += w2[u] * p[u];
     }
     if (abs(sum1) > imb1 * 1.1)
-      cerr << sum1 / total1 << "? ";
+      cerr << sum1 / total1 << "! ";
     if (abs(sum2) > imb2 * 1.1)
-      cerr << sum2 / total2 << "! ";
+      cerr << sum2 / total2 << "!! ";
   }
 };
 
