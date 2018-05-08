@@ -187,7 +187,7 @@ struct Projections {
     assert(abs(sum2) < g.imbalance[1] * 1.2);
   }
 
-  static void dykstra(Graph& g, double) {
+  static void dykstra(Graph& g) {
     int constraintsCount = g.constraintsCount;
     parallel_for(g.vertices, [&](Vertex& v) {
       for (int c = 0; c < constraintsCount; ++c) {
@@ -195,19 +195,19 @@ struct Projections {
       }
       v.incCube = 0;
     });
-    for (int it = 0; it < 3; ++it) {
+    for (int it = 0; it < 5; ++it) {
       for (int c = 0; c < constraintsCount; ++c) {
         double sum = parallel_sum(g.vertices, [&](Vertex &v) {
           v.p -= v.incPlane[c];
           v.incPlane[c] = 0;
-          return v.p;
+          return v.w[c] * v.p;
         });
         if (abs(sum) < g.imbalance[c]) {
           continue;
         }
         double dif = sign(sum) * (abs(sum) - g.imbalance[c]);
         parallel_for(g.vertices, [&](Vertex& v) {
-          double newP = v.p - dif;
+          double newP = v.p - v.w[c] * dif;
           v.incPlane[c] = newP - v.p;
           v.p = newP;
         });

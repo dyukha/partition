@@ -36,6 +36,12 @@ bool was[1000000];
 
 ofstream out;
 
+enum Method {
+  PRECISE,
+  DYKSTRA,
+  ALTER
+};
+
 void printRes(const Partition& best, const Graph& g, double cut, ostream& out) {
   out << cut << " (";
   for (const auto& p : best.part)
@@ -63,8 +69,8 @@ void runMany(int solutionNumber, const string& fileName, const string& name, con
       measureTime(to_string(i) + "-th iteration", [&]() {
         Partition partition = solve();
         // Enforce balance
-        partition.fixPartition();
-        assert(partition.check());
+//        partition.fixPartition();
+//        assert(partition.check());
         {
           double val = objective(partition);
           out << val << " ";
@@ -96,21 +102,25 @@ std::function<double (const Partition&)> cut(Graph& g) {
   return [&g] (const Partition& p) { return p.cut(g); };
 }
 
-void gradientDescent(Graph &g, double eps, int solutionNumber, double step, const string& fileName) {
+void gradientDescent(Graph &g, double eps, int solutionNumber, double step, const string& fileName, Method method) {
   int n = g.n;
   vector<double> w1(n);
   for (int i = 0; i < n; i++) {
     w1[i] = 1;
   }
   vector<vector<double>> w = {w1};
+  function<void (Graph&)> projection;
+  switch (method) {
+    case PRECISE: projection = Projections::precise1D; break;
+    case DYKSTRA: projection = Projections::dykstra; break;
+    case ALTER: projection = Projections::simple; break;
+  }
   runMany(solutionNumber, fileName, "Grad", g, cut(g), [&] {
-//    return GradientDescentImpl(step, Projections::precise).apply(g, eps, 0.5);
-    return GradientDescentImpl(step, [&](Graph& g) {return Projections::simple(g); }).apply(g, w, eps);
-//    return GradientDescentImpl(step, Projections::dykstra).apply(g, eps, 0.5);
+    return GradientDescentImpl(step, projection).apply(g, w, eps);
   });
 }
 
-void gradientDescent2D(Graph &g, double eps, int solutionNumber, double step, const string& fileName) {
+void gradientDescent2D(Graph &g, double eps, int solutionNumber, double step, const string& fileName, Method method) {
   int n = g.n;
   vector<double> w1(n), w2(n);
   for (int i = 0; i < n; i++) {
@@ -118,10 +128,14 @@ void gradientDescent2D(Graph &g, double eps, int solutionNumber, double step, co
     w2[i] = g.vertices[i].deg;
   }
   vector<vector<double>> w = {w1, w2};
+  function<void (Graph&)> projection;
+  switch (method) {
+    case PRECISE: projection = Projections::precise2D; break;
+    case DYKSTRA: projection = Projections::dykstra; break;
+    case ALTER: projection = Projections::simple; break;
+  }
   runMany(solutionNumber, fileName, "Grad", g, cut(g), [&] {
-//    return GradientDescentImpl(step, [&](vector<double>& p, double eps, double) {return Projections::precise2D(p, eps, w1, w2); }).apply(g, eps, 0.5);
-//    return GradientDescentImpl(step, [&](vector<double>& p, double eps, double) {return Projections::dykstra2D(p, eps, w1, w2); }).apply(g, eps, 0.5);
-    return GradientDescentImpl(step, [&](Graph& g) {return Projections::simple(g); }).apply(g, w, eps);
+    return GradientDescentImpl(step, projection).apply(g, w, eps);
   });
 }
 
@@ -196,7 +210,7 @@ int main(int argc, char** argv) {
       cerr << name << ": " << endl;
       Graph g = Graph::read(getPath(name));
       string fileName = dir + "/" + name;
-      gradientDescent(g, 0.01, 3, 0.0005, fileName);
+      gradientDescent(g, 0.01, 3, 0.0005, fileName, DYKSTRA);
 //      gradientDescent2D(g, 0.01, 3, 0.0005, fileName);
 //      gradientDescentManyParts(g, 0.01, 3, 0.0003, 20, fileName);
 //      gradientDescentManyPartsSimultanious(g, 0.03, 3, 0.0003, 20, fileName);

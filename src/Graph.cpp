@@ -155,7 +155,6 @@ struct Graph {
       imbalance[c] = sum[c] * eps * 0.95; // Allow a bit more imbalance to avoid problems during rounding
     }
     parallel_for(vertices, [&](Vertex& v) {
-      v.incCube = 0;
       v.incPlane = vector<double>(constraintsCount);
       v.w = vector<double>(constraintsCount);
       for (int c = 0; c < constraintsCount; ++c) {
