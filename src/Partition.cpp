@@ -81,7 +81,7 @@ struct Partition {
   double cut(Graph& g) const {
     return parallel_sum(g.vertices, [&] (Vertex& v) {
       double res = 0;
-      for (int u : v.e)
+      for (int u : v.edges)
         if (map[u] != map[v.id])
           res++;
       return res;
@@ -108,14 +108,14 @@ struct Partition {
   vector<double> innerDegrees(const Graph& g) const {
     vector<double> res(k);
     for (const Vertex& v : g.vertices)
-      res[map[v.id]] += g.vertices[v.id].deg;
+      res[map[v.id]] += g.vertices[v.id].degree;
     return res;
   }
 
   vector<double> innerEdges(const Graph& g) const {
     vector<double> res(k);
     for (const Vertex& v : g.vertices)
-      for (int u : v.e)
+      for (int u : v.edges)
         if (map[u] == map[v.id] && u < v.id)
           res[map[u]] ++;
     return res;

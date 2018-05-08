@@ -50,7 +50,7 @@ struct RecursiveClustering {
     }
     vector<tuple<int, int> > edges[2];
     for (const Vertex& v : g.vertices)
-      for (int u : v.e)
+      for (int u : v.edges)
         if (u < v.id && split.map[u] == split.map[v.id])
           edges[split.map[u]].emplace_back(map[u], map[v.id]);
     vector<Partition> part(2);

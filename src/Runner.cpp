@@ -125,7 +125,7 @@ void gradientDescent2D(Graph &g, double eps, int solutionNumber, double step, co
   vector<double> w1(n), w2(n);
   for (int i = 0; i < n; i++) {
     w1[i] = 1;
-    w2[i] = g.vertices[i].deg;
+    w2[i] = g.vertices[i].degree;
   }
   vector<vector<double>> w = {w1, w2};
   function<void (Graph&)> projection;
@@ -156,7 +156,7 @@ void gradientDescentManyParts(Graph &g, double eps, int solutionNumber, double s
       get<1>(cuts[i+1]) += get<1>(cuts[i]);
     }
     cerr << "Cuts for the corresponding cluster count: ";
-    double edgeCount = parallel_sum(g.vertices, [](const Vertex& v) {return v.deg;}) / 2;
+    double edgeCount = parallel_sum(g.vertices, [](const Vertex& v) {return v.degree;}) / 2;
     for (auto cut : cuts)
       cerr << "[" << get<0>(cut) << ": " << get<1>(cut) << " (" << (int)(10000. * get<1>(cut) / edgeCount) / 100. << "%)] ";
     cerr << endl;

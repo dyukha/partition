@@ -30,9 +30,9 @@ char buffer[BufSize];
 
 struct Vertex {
   int id; // vertex index
-  int deg; // degree
+  int degree; // degree
 //  int part; // corresponding partition
-  vector<int> e; // list of neighbors
+  vector<int> edges; // list of neighbors
   double p; // for gradient descent - probability in [-1; 1]
   double grad; // for gradient descent - gradient
   vector<double> w; // Weights for constraints.
@@ -70,11 +70,11 @@ struct Graph {
     for (auto p : e) {
       int u, v;
       tie(u, v) = p;
-      vertices[u].e.push_back(v);
-      vertices[v].e.push_back(u);
+      vertices[u].edges.push_back(v);
+      vertices[v].edges.push_back(u);
     }
     for (auto& v : vertices) {
-      v.deg = v.e.size();
+      v.degree = v.edges.size();
     }
   }
 

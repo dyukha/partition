@@ -41,7 +41,7 @@ protected:
   void computeGradient(Graph &g) override {
     parallel_for(g.vertices, [&] (Vertex& v) {
       v.grad = 0;
-      for (int u : v.e) {
+      for (int u : v.edges) {
         v.grad += g.vertices[u].p;
       }
     });
@@ -50,10 +50,10 @@ protected:
   double cut(Graph &g) override {
     return parallel_sum(g.vertices, [&] (Vertex& v) {
       double sum = 0;
-      for (int u : v.e) {
+      for (int u : v.edges) {
         sum += v.p * g.vertices[u].p;
       }
-      return v.deg - sum;
+      return v.degree - sum;
     }) / 4;
   }
 

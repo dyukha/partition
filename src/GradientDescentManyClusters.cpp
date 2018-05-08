@@ -104,7 +104,7 @@ protected:
     parallel_for(g.vertices, [](Vertex& v) {
       for (int j = 0; j < k; ++j) {
         double res = 0;
-        for (int u : v.e)
+        for (int u : v.edges)
           res += p[v][j];
         grad[u][j] = res;
       }
