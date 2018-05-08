@@ -168,11 +168,8 @@ size_t numThreads = (size_t)std::thread::hardware_concurrency();;
  */
 template <class T, class Functor>
 void parallel_for(vector<T>& vector, Functor func) {
-  CHECK(vector.size() > 0);
+  assert(vector.size() > 0);
   auto n = vector.size();
-  numThreads = std::min(numThreads, n);
-  numThreads = std::min(numThreads,
-                        (size_t)std::thread::hardware_concurrency());
   auto stepSize = std::max((size_t)1, (n + numThreads - 1) / numThreads);
 
   if (n <= stepSize || numThreads == 1) {
@@ -207,11 +204,8 @@ void parallel_for(vector<T>& vector, Functor func) {
  */
 template <class Res, class T, class Functor, class Merge>
 Res parallel_reduce(vector<T>& vector, Functor func, Merge merge) {
-  CHECK(vector.size() > 0);
+  assert(vector.size() > 0);
   auto n = vector.size();
-  numThreads = std::min(numThreads, n);
-  numThreads = std::min(numThreads,
-                        (size_t)std::thread::hardware_concurrency());
   auto stepSize = std::max((size_t)1, (n + numThreads - 1) / numThreads);
 
   if (n <= stepSize || numThreads == 1) {

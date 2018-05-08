@@ -67,23 +67,27 @@ void runMany(int solutionNumber, const string& fileName, const string& method, c
     partitionFile.open(fileName + "_partitions.txt", ofstream::out);
     vector<pair<double, Partition> > partitions;
     for (int i = 0; i < solutionNumber; i++) {
-      measureTime(to_string(i) + "-th iteration", [&]() {
-        Partition partition = solve();
-      // Enforce balance
-//      partition.fixPartition();
-//      assert(partition.check());
-        double val = objective(partition);
-        out << val << " ";
-        out.flush();
-        partitions.emplace_back(val, partition);
-        for (int u = 0; u < g.n; u++) {
-          outs[u] = static_cast<char> ('0' + partition.map[u]);
-        }
-        partitionFile << outs << endl;
-        partitionFile.flush();
-        cerr << endl << i << "-th res = ";
-        printRes(partition, g, val, cerr);
-      });
+      try {
+        measureTime(to_string(i) + "-th iteration", [&]() {
+          Partition partition = solve();
+          // Enforce balance
+  //      partition.fixPartition();
+  //      assert(partition.check());
+          double val = objective(partition);
+          out << val << " ";
+          out.flush();
+          partitions.emplace_back(val, partition);
+          for (int u = 0; u < g.n; u++) {
+            outs[u] = static_cast<char> ('0' + partition.map[u]);
+          }
+          partitionFile << outs << endl;
+          partitionFile.flush();
+          cerr << endl << i << "-th res = ";
+          printRes(partition, g, val, cerr);
+        });
+      } catch (std::exception& e) {
+        cerr << string(e.what()) << endl;
+      }
     }
     partitionFile.close();
     int mid = solutionNumber / 2;
@@ -202,7 +206,7 @@ int main(int argc, char** argv) {
   out.precision(7);
   vector<string> files;
   vector<string> darwiniFiles = {"10k", "20k", "50k", "100k", "200k", "500k", "1M", "2M", "5M"};
-  vector<string> snapFiles = {"facebook", "wikiVote", "twitter", "gplus", "LiveJournal", "orkut"};
+  vector<string> snapFiles = {"wikiVote", "facebook", "twitter", "gplus", "LiveJournal", "orkut"};
   vector<string> bigFiles = {"p_500000_10", "p_500000_20", "p_500000_50", "p_500000_100", "p500k", "p5M"};
 
 //  for (auto& f : darwiniFiles) files.push_back(f);
