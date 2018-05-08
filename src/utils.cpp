@@ -41,6 +41,7 @@
 #include <numeric>
 #include <future>
 #include <thread>
+#include <sstream>
 
 #include <chrono>
 #if defined(_WIN32)
@@ -258,5 +259,13 @@ tuple<double, double> parallel_sum_tuple(vector<T>& vector, Functor func) {
     return make_tuple(get<0>(a) + get<0>(b), get<1>(a) + get<1>(b));
   });
 };
+
+
+template <typename T>
+std::string my_to_string(T const& value) {
+  stringstream sstr;
+  sstr << value;
+  return sstr.str();
+}
 
 #endif

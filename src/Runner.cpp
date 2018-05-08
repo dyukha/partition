@@ -58,9 +58,10 @@ void printRes(const Partition& best, const Graph& g, double cut, ostream& out) {
 }
 
 /// Run solve solutionNumber times. The result of solver is
-void runMany(int solutionNumber, const string& fileName, const string& name, const Graph& g, const function<double (const Partition&)>& objective, const function<Partition ()>& solve) {
-  measureTime(fileName.substr(fileName.find("/") + 1), [&]() {
-    out << name << ": ";
+void runMany(int solutionNumber, const string& fileName, const string& method, const Graph& g, const function<double (const Partition&)>& objective, const function<Partition ()>& solve) {
+  measureTime(fileName.substr(fileName.find("/") + 1) + " " + method, [&]() {
+    out << "  " << method << ": ";
+    cerr << method << ": ";
     string outs(g.n, ' ');
     ofstream partitionFile;
     partitionFile.open(fileName + "_partitions.txt", ofstream::out);
@@ -68,22 +69,20 @@ void runMany(int solutionNumber, const string& fileName, const string& name, con
     for (int i = 0; i < solutionNumber; i++) {
       measureTime(to_string(i) + "-th iteration", [&]() {
         Partition partition = solve();
-        // Enforce balance
-//        partition.fixPartition();
-//        assert(partition.check());
-        {
-          double val = objective(partition);
-          out << val << " ";
-          out.flush();
-          partitions.emplace_back(val, partition);
-          for (int u = 0; u < g.n; u++) {
-            outs[u] = static_cast<char> ('0' + partition.map[u]);
-          }
-          partitionFile << outs << endl;
-          partitionFile.flush();
-          cerr << endl << i << "-th res = ";
-          printRes(partition, g, val, cerr);
+      // Enforce balance
+//      partition.fixPartition();
+//      assert(partition.check());
+        double val = objective(partition);
+        out << val << " ";
+        out.flush();
+        partitions.emplace_back(val, partition);
+        for (int u = 0; u < g.n; u++) {
+          outs[u] = static_cast<char> ('0' + partition.map[u]);
         }
+        partitionFile << outs << endl;
+        partitionFile.flush();
+        cerr << endl << i << "-th res = ";
+        printRes(partition, g, val, cerr);
       });
     }
     partitionFile.close();
@@ -110,12 +109,22 @@ void gradientDescent(Graph &g, double eps, int solutionNumber, double step, cons
   }
   vector<vector<double>> w = {w1};
   function<void (Graph&)> projection;
+  string methodName;
   switch (method) {
-    case PRECISE: projection = Projections::precise1D; break;
-    case DYKSTRA: projection = Projections::dykstra; break;
-    case ALTER: projection = Projections::simple; break;
+    case PRECISE:
+      projection = Projections::precise1D;
+      methodName = "precise";
+      break;
+    case DYKSTRA:
+      projection = Projections::dykstra;
+      methodName = "dykstra";
+      break;
+    case ALTER:
+      projection = Projections::simple;
+      methodName = "alter";
+      break;
   }
-  runMany(solutionNumber, fileName, "Grad", g, cut(g), [&] {
+  runMany(solutionNumber, fileName, methodName + " (step=" + my_to_string(step) +", eps=" + my_to_string(eps) + ")", g, cut(g), [&] {
     return GradientDescentImpl(step, projection).apply(g, w, eps);
   });
 }
@@ -129,12 +138,22 @@ void gradientDescent2D(Graph &g, double eps, int solutionNumber, double step, co
   }
   vector<vector<double>> w = {w1, w2};
   function<void (Graph&)> projection;
+  string methodName;
   switch (method) {
-    case PRECISE: projection = Projections::precise2D; break;
-    case DYKSTRA: projection = Projections::dykstra; break;
-    case ALTER: projection = Projections::simple; break;
+    case PRECISE:
+      projection = Projections::precise2D;
+      methodName = "precise";
+      break;
+    case DYKSTRA:
+      projection = Projections::dykstra;
+      methodName = "dykstra";
+      break;
+    case ALTER:
+      projection = Projections::simple;
+      methodName = "alter";
+      break;
   }
-  runMany(solutionNumber, fileName, "Grad", g, cut(g), [&] {
+  runMany(solutionNumber, fileName, methodName + "2D (step=" + my_to_string(step) +", eps=" + my_to_string(eps) + ")", g, cut(g), [&] {
     return GradientDescentImpl(step, projection).apply(g, w, eps);
   });
 }
@@ -206,12 +225,19 @@ int main(int argc, char** argv) {
 
   measureTime("Total", [&]() {
     for (const string &name: files) {
-      out << name << ": ";
+      out << name << ": " << endl;
       cerr << name << ": " << endl;
       Graph g = Graph::read(getPath(name));
       string fileName = dir + "/" + name;
-      gradientDescent(g, 0.01, 3, 0.0005, fileName, DYKSTRA);
-//      gradientDescent2D(g, 0.01, 3, 0.0005, fileName);
+      double step = 0.001;
+      double eps = 0.01;
+      int cnt = 3;
+      gradientDescent(g, eps, cnt, step, fileName, ALTER);
+      gradientDescent(g, eps, cnt, step, fileName, DYKSTRA);
+      gradientDescent(g, eps, cnt, step, fileName, PRECISE);
+      gradientDescent2D(g, eps, cnt, step, fileName, ALTER);
+      gradientDescent2D(g, eps, cnt, step, fileName, DYKSTRA);
+      gradientDescent2D(g, eps, cnt, step, fileName, PRECISE);
 //      gradientDescentManyParts(g, 0.01, 3, 0.0003, 20, fileName);
 //      gradientDescentManyPartsSimultanious(g, 0.03, 3, 0.0003, 20, fileName);
       out.flush();

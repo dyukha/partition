@@ -48,7 +48,7 @@ struct Projections {
   static void precise1D(Graph& g) {
     assert(g.constraintsCount == 1);
     double idealSum = 0; //- n * proportion + n * (1 - proportion);
-    double sum = parallel_sum(g.vertices, [](const Vertex &v) { return v.p; });
+    double sum = parallel_sum(g.vertices, [](const Vertex &v) { return v.w[0] + v.p; });
     sum -= idealSum;
     double dif = getDif(g, 0);
     double lam;
@@ -67,7 +67,7 @@ struct Projections {
       for (int it = 0; it < 30; ++it) {
         double lam = (left + right) / 2;
         double dif = getDif(g, lam);
-        if (abs(dif - cmp) < imbalance * 1.01)
+        if (abs(dif - cmp) < imbalance * 0.01)
           break;
         if (dif > cmp) {
           right = lam;
@@ -79,7 +79,7 @@ struct Projections {
     }
     parallel_for(g.vertices, [&](Vertex &v) { v.p = roundCube(v.p - lam); });
     // check
-    sum = parallel_sum(g.vertices, [](const Vertex &v) { return v.p; });
+    sum = parallel_sum(g.vertices, [](const Vertex &v) { return v.w[0] + v.p; });
     assert(abs(sum - idealSum) < imbalance * 1.02);
   }
 
