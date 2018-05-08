@@ -29,14 +29,14 @@
 #include "Projections.cpp"
 
 struct RecursiveClustering {
-  static Partition apply (const Graph& g, double eps, double step, int k, vector<tuple<int, double>>& cuts, int depth = 0) {
+  static Partition apply (Graph& g, double eps, double step, int k, vector<tuple<int, double>>& cuts, int depth = 0) {
     int n = g.n;
     if (k == 1)
       return Partition(n, 1, eps);
     // Left corresponds to 0, right - to 1
     vector<int> sz = { k/2, k - k/2 };
     cerr << "n = " << g.n <<"; k = " << k << endl;
-    Partition split = GradientDescentImpl(step, Projections::simple).apply(g, eps, sz[0] * 1.0 / k);
+    Partition split = GradientDescentImpl(step, Projections::precise1D).apply(g, eps);
     double cut = split.cut(g);
     while (cuts.size() <= depth)
       cuts.emplace_back(0, 0);
@@ -49,14 +49,15 @@ struct RecursiveClustering {
       map[i] = cnt[split.map[i]]++;
     }
     vector<tuple<int, int> > edges[2];
-    for (int u = 0; u < n; ++u)
-      for (int v : g.g[u])
-        if (u < v && split.map[u] == split.map[v])
-          edges[split.map[u]].emplace_back(map[u], map[v]);
+    for (const Vertex& v : g.vertices)
+      for (int u : v.e)
+        if (u < v.id && split.map[u] == split.map[v.id])
+          edges[split.map[u]].emplace_back(map[u], map[v.id]);
     vector<Partition> part(2);
 //#pragma omp parallel for
     for (int t = 0; t < 2; ++t) {
-      part[t] = apply(Graph(cnt[t], edges[t]), eps, step, sz[t], cuts, depth+1);
+      Graph g1(cnt[t], edges[t]);
+      part[t] = apply(g1, eps, step, sz[t], cuts, depth+1);
     }
     Partition res(n, k, eps * 4.5);
     for (int i = 0; i < n; ++i) {

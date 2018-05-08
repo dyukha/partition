@@ -27,9 +27,9 @@
 
 class GradientDescentImpl : public GradientDescent {
   double stepSize;
-  function<void ((vector<double>& p, double eps, double proportion))> projection;
+  function<void (Graph& g)> projection;
 public:
-  explicit GradientDescentImpl(double stepSize, const function<void(vector<double> &, double, double)>& projection)
+  explicit GradientDescentImpl(double stepSize, const function<void(Graph&)>& projection)
           : stepSize(stepSize), projection(projection) {}
 
 protected:
@@ -38,29 +38,27 @@ protected:
     return stepSize;
   }
 
-  void computeGradient(const Graph &g) override {
-#pragma omp parallel for
-    for (int u = 0; u < n; u++) {
-      grad[u] = 0;
-      for (int v : g.g[u])
-        grad[u] += p[v];
-    }
+  void computeGradient(Graph &g) override {
+    parallel_for(g.vertices, [&] (Vertex& v) {
+      v.grad = 0;
+      for (int u : v.e) {
+        v.grad += g.vertices[u].p;
+      }
+    });
   }
 
-  double cut(const Graph &g) override {
-    double val = 0;
-#pragma omp parallel for reduction(+:val)
-    for (int u = 0; u < n; ++u) {
+  double cut(Graph &g) override {
+    return parallel_sum(g.vertices, [&] (Vertex& v) {
       double sum = 0;
-      for (int v : g.g[u])
-        sum += p[u] * p[v];
-      val += (g.g[u].size() - sum);
-    }
-    return val / 4;
+      for (int u : v.e) {
+        sum += v.p * g.vertices[u].p;
+      }
+      return v.deg - sum;
+    }) / 4;
   }
 
-  void project(double eps, double proportion) override {
-    projection(p, eps, proportion);
+  void project(Graph &g) override {
+    projection(g);
   }
 };
 

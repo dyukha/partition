@@ -78,13 +78,14 @@ struct Partition {
     return true;
   }
 
-  double cut(const Graph& g) const {
-    double res = 0;
-    for (int u = 0; u < n; ++u)
-      for (int v : g.g[u])
-        if (map[u] != map[v])
-          res ++;
-    return res /= 2;
+  double cut(Graph& g) const {
+    return parallel_sum(g.vertices, [&] (Vertex& v) {
+      double res = 0;
+      for (int u : v.e)
+        if (map[u] != map[v.id])
+          res++;
+      return res;
+    }) / 2;
   }
 
   void fixPartition() {
@@ -106,18 +107,17 @@ struct Partition {
 
   vector<double> innerDegrees(const Graph& g) const {
     vector<double> res(k);
-    for (int u = 0; u < n; ++u)
-      res[map[u]] += g.g[u].size();
+    for (const Vertex& v : g.vertices)
+      res[map[v.id]] += g.vertices[v.id].deg;
     return res;
   }
 
   vector<double> innerEdges(const Graph& g) const {
     vector<double> res(k);
-    for (int u = 0; u < n; ++u) {
-      for (int v : g.g[u])
-        if (map[u] == map[v] && u < v)
+    for (const Vertex& v : g.vertices)
+      for (int u : v.e)
+        if (map[u] == map[v.id] && u < v.id)
           res[map[u]] ++;
-    }
     return res;
   }
 };

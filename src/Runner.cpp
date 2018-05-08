@@ -26,10 +26,10 @@
 #include "utils.cpp"
 #include "Graph.cpp"
 #include "Partition.cpp"
-#include "GradientDescentManyClusters.cpp"
+//#include "GradientDescentManyClusters.cpp"
 #include "GradientDescent.cpp"
 #include "GradientDescentImpl.cpp"
-#include "RecursiveClustering.cpp"
+//#include "RecursiveClustering.cpp"
 #include "Projections.cpp"
 
 bool was[1000000];
@@ -65,7 +65,6 @@ void runMany(int solutionNumber, const string& fileName, const string& name, con
         // Enforce balance
         partition.fixPartition();
         assert(partition.check());
-#pragma omp critical
         {
           double val = objective(partition);
           out << val << " ";
@@ -93,39 +92,47 @@ void runMany(int solutionNumber, const string& fileName, const string& name, con
   cerr << endl;
 }
 
-std::function<double (const Partition&)> cut(const Graph& g) {
+std::function<double (const Partition&)> cut(Graph& g) {
   return [&g] (const Partition& p) { return p.cut(g); };
 }
 
-void gradientDescent(const Graph &g, double eps, int solutionNumber, double step, const string& fileName) {
+void gradientDescent(Graph &g, double eps, int solutionNumber, double step, const string& fileName) {
+  int n = g.n;
+  vector<double> w1(n);
+  for (int i = 0; i < n; i++) {
+    w1[i] = 1;
+  }
+  vector<vector<double>> w = {w1};
   runMany(solutionNumber, fileName, "Grad", g, cut(g), [&] {
 //    return GradientDescentImpl(step, Projections::precise).apply(g, eps, 0.5);
-    return GradientDescentImpl(step, Projections::simple).apply(g, eps, 0.5);
+    return GradientDescentImpl(step, [&](Graph& g) {return Projections::simple(g); }).apply(g, w, eps);
 //    return GradientDescentImpl(step, Projections::dykstra).apply(g, eps, 0.5);
   });
 }
 
-void gradientDescent2D(const Graph &g, double eps, int solutionNumber, double step, const string& fileName) {
+void gradientDescent2D(Graph &g, double eps, int solutionNumber, double step, const string& fileName) {
   int n = g.n;
   vector<double> w1(n), w2(n);
   for (int i = 0; i < n; i++) {
     w1[i] = 1;
-    w2[i] = g.g[i].size();
+    w2[i] = g.vertices[i].deg;
   }
+  vector<vector<double>> w = {w1, w2};
   runMany(solutionNumber, fileName, "Grad", g, cut(g), [&] {
 //    return GradientDescentImpl(step, [&](vector<double>& p, double eps, double) {return Projections::precise2D(p, eps, w1, w2); }).apply(g, eps, 0.5);
 //    return GradientDescentImpl(step, [&](vector<double>& p, double eps, double) {return Projections::dykstra2D(p, eps, w1, w2); }).apply(g, eps, 0.5);
-    return GradientDescentImpl(step, [&](vector<double>& p, double eps, double) {return Projections::simple2D(p, eps, w1, w2); }).apply(g, eps, 0.5);
+    return GradientDescentImpl(step, [&](Graph& g) {return Projections::simple(g); }).apply(g, w, eps);
   });
 }
 
-void gradientDescentManyPartsSimultanious(const Graph &g, double eps, int solutionNumber, double step, int k, const string& fileName) {
-  runMany(solutionNumber, fileName, "Grad", g, cut(g), [&] {
-    return GradientDescentManyClusters(step).apply(g, eps, k);
-  });
-}
+//void gradientDescentManyPartsSimultanious(const Graph &g, double eps, int solutionNumber, double step, int k, const string& fileName) {
+//  runMany(solutionNumber, fileName, "Grad", g, cut(g), [&] {
+//    return GradientDescentManyClusters(step).apply(g, eps, k);
+//  });
+//}
 
-void gradientDescentManyParts(const Graph &g, double eps, int solutionNumber, double step, int k, const string& fileName) {
+/*
+void gradientDescentManyParts(Graph &g, double eps, int solutionNumber, double step, int k, const string& fileName) {
   runMany(solutionNumber, fileName, "Grad", g, cut(g), [&] {
     vector<tuple<int, double> > cuts;
     auto res = RecursiveClustering::apply(g, eps / 4.5, step, k, cuts);
@@ -135,41 +142,14 @@ void gradientDescentManyParts(const Graph &g, double eps, int solutionNumber, do
       get<1>(cuts[i+1]) += get<1>(cuts[i]);
     }
     cerr << "Cuts for the corresponding cluster count: ";
-    double edgeCount = 0;
-    for (int i = 0; i < g.n; ++i) {
-      edgeCount += g.g[i].size();
-    }
-    edgeCount /= 2;
+    double edgeCount = parallel_sum(g.vertices, [](const Vertex& v) {return v.deg;}) / 2;
     for (auto cut : cuts)
       cerr << "[" << get<0>(cut) << ": " << get<1>(cut) << " (" << (int)(10000. * get<1>(cut) / edgeCount) / 100. << "%)] ";
     cerr << endl;
     return res;
   });
 }
-
-/*
-void gradientDescentMemAggressive(const Graph &g, int innerIterNumber, double eps, int solutionNumber, const string& fileName) {
-  runMany(solutionNumber, fileName, "GradMem", g, cut(g), [&] {
-    return GradientDescent::applyMemAggressive(g, innerIterNumber, eps, 1, fileName);
-  });
-}
 */
-
-void degreeDistribution(Graph& g) {
-  vector<long> dist;
-  for (int i = 0; i < g.n; i++) {
-    dist.push_back(g.g[i].size());
-  }
-  sort(dist.begin(), dist.end());
-  int cnt = 8;
-  for (int i = 0; i < cnt; i++)
-    out << dist[(i+1) * g.n / cnt - 1] << " ";
-  int sum = 0;
-  for (int i = 0; i < g.n; i++)
-    sum += dist[i];
-  out << " | avg = " << sum / g.n;
-  out << endl;
-}
 
 inline string getPath(const string& fileName) {
   return string("data/") + fileName + string(".txt");
@@ -216,8 +196,8 @@ int main(int argc, char** argv) {
       cerr << name << ": " << endl;
       Graph g = Graph::read(getPath(name));
       string fileName = dir + "/" + name;
-//      gradientDescent(g, 0.01, 3, 0.0005, fileName);
-      gradientDescent2D(g, 0.01, 3, 0.0005, fileName);
+      gradientDescent(g, 0.01, 3, 0.0005, fileName);
+//      gradientDescent2D(g, 0.01, 3, 0.0005, fileName);
 //      gradientDescentManyParts(g, 0.01, 3, 0.0003, 20, fileName);
 //      gradientDescentManyPartsSimultanious(g, 0.03, 3, 0.0003, 20, fileName);
       out.flush();

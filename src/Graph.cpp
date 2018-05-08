@@ -28,6 +28,19 @@
 const int BufSize = 1000000;
 char buffer[BufSize];
 
+struct Vertex {
+  int id; // vertex index
+  int deg; // degree
+//  int part; // corresponding partition
+  vector<int> e; // list of neighbors
+  double p; // for gradient descent - probability in [-1; 1]
+  double grad; // for gradient descent - gradient
+  vector<double> w; // Weights for constraints.
+//  double prevP; // for gradient descent - previous value of p (while checking that the value changed)
+  vector<double> incPlane; // Increments for Dykstra projection. For each plane constraint.
+  double incCube; // Increments for Dykstra projection. For cube constraint.
+};
+
 struct Graph {
   /// To add each edge exactly once
   struct DuplicateChecker {
@@ -45,15 +58,23 @@ struct Graph {
   };
 
   int n;
-  vector<vector<int>> g;
+  size_t constraintsCount;
+  vector<Vertex> vertices;
+  vector<double> imbalance;
 
   Graph(int n, const vector<tuple<int, int>>& e) : n(n) {
-    g = vector<vector<int>>(n);
+    vertices = vector<Vertex>(n);
+    for (int i = 0; i < n; ++i) {
+      vertices[i].id = i;
+    }
     for (auto p : e) {
       int u, v;
       tie(u, v) = p;
-      g[u].push_back(v);
-      g[v].push_back(u);
+      vertices[u].e.push_back(v);
+      vertices[v].e.push_back(u);
+    }
+    for (auto& v : vertices) {
+      v.deg = v.e.size();
     }
   }
 
@@ -114,6 +135,33 @@ struct Graph {
     cerr << "Graph is read. " << map.size() << " vertices, " << e.size() << " edges." << endl;
     Graph res = Graph(static_cast<int>(map.size()), e);
     return res;
+  }
+
+  void prepare(const vector<vector<double>>& weights, double eps) {
+    constraintsCount = weights.size();
+    vector<double> len(constraintsCount);
+    vector<double> sum(constraintsCount);
+    imbalance = vector<double>(constraintsCount);
+    for (int c = 0; c < constraintsCount; ++c) {
+      assert(n == weights[c].size());
+      double sqLen = 0;
+      for (int i = 0; i < n; ++i) {
+        double w = weights[c][i];
+        sum[c] += w;
+        sqLen += w * w;
+      }
+      len[c] = sqrt(sqLen);
+      sum[c] /= len[c];
+      imbalance[c] = sum[c] * eps * 0.95; // Allow a bit more imbalance to avoid problems during rounding
+    }
+    parallel_for(vertices, [&](Vertex& v) {
+      v.incCube = 0;
+      v.incPlane = vector<double>(constraintsCount);
+      v.w = vector<double>(constraintsCount);
+      for (int c = 0; c < constraintsCount; ++c) {
+        v.w[c] = weights[c][v.id] / len[c];
+      }
+    });
   }
 };
 

@@ -32,48 +32,32 @@ class GradientDescent {
 public:
   /// Partition graph g with imbalance eps.
   /// Can split into not-equal sizes, as defined by proportion parameter.
-  Partition apply(const Graph &g, double eps, double proportion) {
+  Partition apply(Graph &g, const vector<vector<double>> weights, double eps) {
+    g.prepare(weights, eps);
     // inner imbalance
-    eps *= 0.95;
     n = g.n;
-    p = vector<double>(n);
-    prevP = vector<double>(n);
-    grad = vector<double>(n);
 
-    for (int i = 0; i < n; i++) {
-      p[i] = 0.02 * (Rand::nextRand() - 1 + proportion);
-      prevP[i] = p[i];
+    for (auto& v : g.vertices) {
+      v.p = 0.02 * (Rand::nextRand() - 1);
     }
     cerr << "Objective each 10 iterations: ";
-    project(eps, proportion);
+    project(g);
 
-    computeGradient(g);
     for (int iter = 0; ; iter++) {
       if (iter % 10 == 0 && (isFinished(g) && iter >= 500)) // The strange order to output cut
         break;
-      if (iter % 20 == 0)
-        computeGradient(g);
+      computeGradient(g);
       double stepSize = step(iter);
-#pragma omp parallel for
-      for (int u = 0; u < n; ++u) {
-        p[u] += grad[u] * stepSize;
-      }
-      project(eps, proportion);
-#pragma omp parallel for
-      for (int u = 0; u < n; ++u) {
-        if (abs(p[u] - prevP[u]) > 1e-6) {
-          double dif = p[u] - prevP[u];
-          prevP[u] = p[u];
-          for (auto v : g.g[u])
-#pragma omp atomic
-            grad[v] += dif;
-        }
-      }
+      parallel_for(g.vertices, [stepSize] (Vertex& v) {
+        v.p += v.grad * stepSize;
+      });
+      project(g);
     }
     cerr << endl;
     Partition part(n, 2, eps);
-    for (int u = 0; u < n; u++)
-      part.move(u, Rand::check(0.5 * (1 + p[u])) ? 1 : 0);
+    for (auto& v : g.vertices) {
+      part.move(v.id, Rand::check(0.5 * (1 + v.p)) ? 1 : 0);
+    }
     return part;
   }
 
@@ -81,11 +65,11 @@ protected:
   /// Step size (depending on the iteration).
   virtual double step(int iteration) = 0;
   /// Gradient computation function
-  virtual void computeGradient(const Graph &g) = 0;
+  virtual void computeGradient(Graph &g) = 0;
   /// Probabilistic cut
-  virtual double cut(const Graph &g) = 0;
+  virtual double cut(Graph &g) = 0;
   /// Projection function. The argument is imbalance
-  virtual void project(double eps, double proportion) = 0;
+  virtual void project(Graph &g) = 0;
 
   /// Array of probabilities
   vector<double> p;
@@ -99,7 +83,7 @@ protected:
   int n;
 
   /// Projection function. The argument is imbalance
-  virtual bool isFinished(const Graph& g) {
+  virtual bool isFinished(Graph& g) {
     double val = cut(g);
     cerr << static_cast<long long int>(val) << " ";
     if (val > 0.1)

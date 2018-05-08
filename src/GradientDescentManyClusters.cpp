@@ -59,8 +59,7 @@ public:
     for (int iter = 0; ; iter++) {
       if (iter % 10 == 0 && (isFinished(g) && iter >= 200)) // The strange order to output cut
         break;
-      if (iter % 10 == 0)
-        computeGradient(g);
+      computeGradient(g);
       double stepSize = step(iter);
 #pragma omp parallel for
       for (int u = 0; u < n; ++u)
@@ -101,16 +100,15 @@ protected:
     return iteration < 400 ? stepSize * 10 : stepSize;
   }
   /// Gradient computation function
-  void computeGradient(const Graph &g) {
-#pragma omp parallel for
-    for (int u = 0; u < n; ++u) {
+  void computeGradient(Graph &g) {
+    parallel_for(g.vertices, [](Vertex& v) {
       for (int j = 0; j < k; ++j) {
         double res = 0;
-        for (int v : g.g[u])
+        for (int u : v.e)
           res += p[v][j];
         grad[u][j] = res;
       }
-    }
+    });
   }
   /// Probabilistic cut
   double cut(const Graph &g) {
