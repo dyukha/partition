@@ -27,38 +27,52 @@
 
 class GradientDescentImpl : public GradientDescent {
   double stepSize;
-  function<void (Graph& g)> projection;
+  function<void (Graph& g, int)> projection;
 public:
-  explicit GradientDescentImpl(double stepSize, const function<void(Graph&)>& projection)
+  explicit GradientDescentImpl(double stepSize, const function<void(Graph&, int)>& projection)
           : stepSize(stepSize), projection(projection) {}
 
 protected:
-
   double step(int) override {
     return stepSize;
   }
 
   void computeGradient(Graph &g) override {
     parallel_for(g.vertices, [&] (Vertex& v) {
-      v.grad = 0;
-      for (int u : v.edges) {
-        v.grad += g.vertices[u].p;
+      double delta = v.p - v.last_p;
+      if (abs(delta) > 1e-5) {
+        v.last_p = v.p;
+        for (int u : v.edges) {
+          if (g.vertices[u].bucket == v.bucket) {
+            g.vertices[u].grad += delta; // Not exactly correct, but should be fine
+          }
+        }
       }
     });
+//    parallel_for(g.vertices, [&] (Vertex& v) {
+//      v.grad = 0;
+//      for (int u : v.edges) {
+//        v.grad += g.vertices[u].p;
+//      }
+//    });
   }
 
   double cut(Graph &g) override {
     return parallel_sum(g.vertices, [&] (Vertex& v) {
       double sum = 0;
       for (int u : v.edges) {
-        sum += v.p * g.vertices[u].p;
+        if (g.vertices[u].bucket == v.bucket) {
+          sum += (1 - v.p * g.vertices[u].p) / 2;
+        } else {
+          sum ++;
+        }
       }
-      return v.degree - sum;
-    }) / 4;
+      return sum;
+    }) / 2;
   }
 
-  void project(Graph &g) override {
-    projection(g);
+  void project(Graph &g, int depth) override {
+    projection(g, depth);
   }
 };
 

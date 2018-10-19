@@ -61,7 +61,7 @@ void printRes(const Partition& best, const Graph& g, double cut, ostream& out) {
 void runMany(int solutionNumber, const string& fileName, const string& method, const Graph& g, const function<double (const Partition&)>& objective, const function<Partition ()>& solve) {
   measureTime(fileName.substr(fileName.find("/") + 1) + " " + method, [&]() {
     out << "  " << method << ": ";
-    cerr << method << ": ";
+    cerr << method << ":" << endl;
     string outs(g.n, ' ');
     ofstream partitionFile;
     partitionFile.open(fileName + "_partitions.txt", ofstream::out);
@@ -72,7 +72,7 @@ void runMany(int solutionNumber, const string& fileName, const string& method, c
           Partition partition = solve();
           // Enforce balance
   //      partition.fixPartition();
-  //      assert(partition.check());
+//        assert(partition.check());
           double val = objective(partition);
           out << val << " ";
           out.flush();
@@ -105,14 +105,14 @@ std::function<double (const Partition&)> cut(Graph& g) {
   return [&g] (const Partition& p) { return p.cut(g); };
 }
 
-void gradientDescent(Graph &g, double eps, int solutionNumber, double step, const string& fileName, Method method) {
+void gradientDescent(Graph &g, double eps, int solutionNumber, double step, const string& fileName, Method method, int depth) {
   int n = g.n;
   vector<double> w1(n);
   for (int i = 0; i < n; i++) {
     w1[i] = 1;
   }
   vector<vector<double>> w = {w1};
-  function<void (Graph&)> projection;
+  function<void (Graph&, int)> projection;
   string methodName;
   switch (method) {
     case PRECISE:
@@ -128,12 +128,12 @@ void gradientDescent(Graph &g, double eps, int solutionNumber, double step, cons
       methodName = "alter";
       break;
   }
-  runMany(solutionNumber, fileName, methodName + " (step=" + my_to_string(step) +", eps=" + my_to_string(eps) + ")", g, cut(g), [&] {
-    return GradientDescentImpl(step, projection).apply(g, w, eps);
+  runMany(solutionNumber, fileName, methodName + " (step=" + my_to_string(step) +", eps=" + my_to_string(eps) + ", depth=" + my_to_string(depth) + ")", g, cut(g), [&] {
+    return GradientDescentImpl(step, projection).apply(g, w, eps, depth);
   });
 }
 
-void gradientDescent2D(Graph &g, double eps, int solutionNumber, double step, const string& fileName, Method method) {
+void gradientDescent2D(Graph &g, double eps, int solutionNumber, double step, const string& fileName, Method method, int depth) {
   int n = g.n;
   vector<double> w1(n), w2(n);
   for (int i = 0; i < n; i++) {
@@ -141,7 +141,7 @@ void gradientDescent2D(Graph &g, double eps, int solutionNumber, double step, co
     w2[i] = g.vertices[i].degree;
   }
   vector<vector<double>> w = {w1, w2};
-  function<void (Graph&)> projection;
+  function<void (Graph&, int)> projection;
   string methodName;
   switch (method) {
     case PRECISE:
@@ -157,8 +157,8 @@ void gradientDescent2D(Graph &g, double eps, int solutionNumber, double step, co
       methodName = "alter";
       break;
   }
-  runMany(solutionNumber, fileName, methodName + "2D (step=" + my_to_string(step) +", eps=" + my_to_string(eps) + ")", g, cut(g), [&] {
-    return GradientDescentImpl(step, projection).apply(g, w, eps);
+  runMany(solutionNumber, fileName, methodName + "2D (step=" + my_to_string(step) +", eps=" + my_to_string(eps) + ", depth=" + my_to_string(depth) + ")", g, cut(g), [&] {
+    return GradientDescentImpl(step, projection).apply(g, w, eps, depth);
   });
 }
 
@@ -206,7 +206,8 @@ int main(int argc, char** argv) {
   out.precision(7);
   vector<string> files;
   vector<string> darwiniFiles = {"10k", "20k", "50k", "100k", "200k", "500k", "1M", "2M", "5M"};
-  vector<string> snapFiles = {"wikiVote", "facebook", "twitter", "gplus", "LiveJournal", "orkut"};
+  vector<string> snapFiles = {/*"facebook", */"gplus", "LiveJournal", "orkut"};
+//  vector<string> snapFiles = {"wikiVote", "facebook", "twitter", "gplus", "LiveJournal", "orkut"};
   vector<string> bigFiles = {"p_500000_10", "p_500000_20", "p_500000_50", "p_500000_100", "p500k", "p5M"};
 
 //  for (auto& f : darwiniFiles) files.push_back(f);
@@ -233,15 +234,16 @@ int main(int argc, char** argv) {
       cerr << name << ": " << endl;
       Graph g = Graph::read(getPath(name));
       string fileName = dir + "/" + name;
-      double step = 0.001;
+      double step = 0.01;
       double eps = 0.01;
-      int cnt = 3;
-      gradientDescent(g, eps, cnt, step, fileName, ALTER);
-      gradientDescent(g, eps, cnt, step, fileName, DYKSTRA);
-      gradientDescent(g, eps, cnt, step, fileName, PRECISE);
-      gradientDescent2D(g, eps, cnt, step, fileName, ALTER);
-      gradientDescent2D(g, eps, cnt, step, fileName, DYKSTRA);
-      gradientDescent2D(g, eps, cnt, step, fileName, PRECISE);
+      int cnt = 1;
+      int depth = 7;
+//      gradientDescent(g, eps, cnt, step, fileName, ALTER, depth);
+//      gradientDescent(g, eps, cnt, step, fileName, DYKSTRA, depth);
+//      gradientDescent(g, eps, cnt, step, fileName, PRECISE, depth);
+      gradientDescent2D(g, eps, cnt, step, fileName, ALTER, depth);
+//      gradientDescent2D(g, eps, cnt, step, fileName, DYKSTRA);
+//      gradientDescent2D(g, eps, cnt, step, fileName, PRECISE);
 //      gradientDescentManyParts(g, 0.01, 3, 0.0003, 20, fileName);
 //      gradientDescentManyPartsSimultanious(g, 0.03, 3, 0.0003, 20, fileName);
       out.flush();

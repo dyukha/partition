@@ -79,7 +79,7 @@ struct Partition {
   }
 
   double cut(Graph& g) const {
-    return parallel_sum(g.vertices, [&] (Vertex& v) {
+    return parallel_sum(g.vertices, [&] (const Vertex& v) {
       double res = 0;
       for (int u : v.edges)
         if (map[u] != map[v.id])

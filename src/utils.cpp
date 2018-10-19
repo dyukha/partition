@@ -77,6 +77,8 @@ if (0 == (condition)) { \
   throw ASSERT_EXIT_CODE; \
 }
 
+typedef long long int int64;
+
 inline void LOG(const char* message, va_list args) {
   auto end = std::chrono::system_clock::now();
   auto time = std::chrono::system_clock::to_time_t(end);
@@ -120,12 +122,12 @@ struct Rand {
       return 0;
     return std::uniform_int_distribution<unsigned int>(0, static_cast<unsigned int>(bound - 1))(generator);
   }
-  static double check(double p) {return nextRand() <= p; }
+  static bool check(double p) {return nextRand() <= p; }
 };
 
 /// If the element present in map, then return it key.
 /// Otherwise, add it into the map with key=size(map) (before adding). Return the key.
-inline static int getOrAdd(const string& u, unordered_map<string, int>& map) {
+inline static int getOrAdd(const int64& u, unordered_map<int64, int>& map) {
   auto p = map.find(u);
   if (p == map.end()) {
     auto size = static_cast<int>(map.size());
@@ -254,12 +256,29 @@ tuple<double, double> parallel_sum_tuple(vector<T>& vector, Functor func) {
   });
 };
 
+template <class T, class Functor>
+double parallel_sum_not_fixed(vector<T>& vector, Functor func) {
+  return parallel_sum<double>(vector, [&](T v) {return v.fixed ? 0. : func(v);});
+};
+
+template <class T, class Functor>
+double parallel_sum_tuple_not_fixed(vector<T>& vector, Functor func) {
+  return parallel_sum<tuple<double, double>>(vector, [&](T v) {return v.fixed ? make_pair(0., 0.) : func(v);});
+};
 
 template <typename T>
 std::string my_to_string(T const& value) {
   stringstream sstr;
   sstr << value;
   return sstr.str();
+}
+
+template<typename T> T getMax(const vector<T>& vector) {
+  return *max_element(begin(vector), end(vector));
+}
+
+template<typename T> T getMin(const vector<T>& vector) {
+  return *min_element(begin(vector), end(vector));
 }
 
 #endif

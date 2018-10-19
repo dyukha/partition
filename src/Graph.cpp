@@ -25,7 +25,7 @@
 
 #include "utils.cpp"
 
-const int BufSize = 1000000;
+const int BufSize = 10 * 1000 * 1000;
 char buffer[BufSize];
 
 struct Vertex {
@@ -34,11 +34,15 @@ struct Vertex {
 //  int part; // corresponding partition
   vector<int> edges; // list of neighbors
   double p; // for gradient descent - probability in [-1; 1]
-  double grad; // for gradient descent - gradient
+  double last_p; // last vertex probability which its neighbors are aware of
+  double prev_p; // vertex probability before the iteration
+  double grad; // gradient
   vector<double> w; // Weights for constraints.
 //  double prevP; // for gradient descent - previous value of p (while checking that the value changed)
   vector<double> incPlane; // Increments for Dykstra projection. For each plane constraint.
   double incCube; // Increments for Dykstra projection. For cube constraint.
+  int bucket; //Current vertex bucket
+  bool fixed; // Is vertex fixed
 };
 
 struct Graph {
@@ -61,8 +65,10 @@ struct Graph {
   size_t constraintsCount;
   vector<Vertex> vertices;
   vector<double> imbalance;
+  int edgeCount;
 
   Graph(int n, const vector<tuple<int, int>>& e) : n(n) {
+    edgeCount = e.size();
     vertices = vector<Vertex>(n);
     for (int i = 0; i < n; ++i) {
       vertices[i].id = i;
@@ -86,16 +92,24 @@ struct Graph {
     return in;
   }
 
+  static int64 toInt64(const string& s) {
+    if (s.length() < 20) {
+      return (int64)stoull(s);
+    } else {
+      return (int64)stoull(s.substr(s.length() - 19));
+    }
+  }
+
   static Graph read(const string &path) {
     string a, b;
     auto in = prepareStream(path);
-    unordered_map<string, int> map;
+    unordered_map<int64, int> map;
     DuplicateChecker duplicateChecker;
     vector<tuple<int, int>> e;
     while (in >> a) {
       in >> b;
-      int u = getOrAdd(a, map);
-      int v = getOrAdd(b, map);
+      int u = getOrAdd(toInt64(a), map);
+      int v = getOrAdd(toInt64(b), map);
       duplicateChecker.add(u, v, e);
     }
     in.close();
@@ -105,9 +119,10 @@ struct Graph {
   }
 
   static Graph readNeighboursList(const string &path) {
-    string a, b;
+    int64 a;
+    string b;
     auto in = prepareStream(path);
-    unordered_map<string, int> map;
+    unordered_map<int64, int> map;
     DuplicateChecker duplicateChecker;
     vector<tuple<int, int>> e;
     while (in >> a) {
@@ -121,13 +136,13 @@ struct Graph {
       int u = getOrAdd(a, map);
       size_t end = b.find(',');
       while (end != string::npos) {
-        int v = getOrAdd(b.substr(start, end - start), map);
+        int v = getOrAdd(stoll(b.substr(start, end - start)), map);
         duplicateChecker.add(u, v, e);
         start = end + 1;
         end = b.find(',', start);
 //        cerr << end << " ";
       }
-      int v = getOrAdd(b.substr(start, end - start), map);
+      int v = getOrAdd(stoll(b.substr(start, end - start)), map);
       auto str = b.substr(start, end - start);
       duplicateChecker.add(u, v, e);
     }
@@ -161,6 +176,16 @@ struct Graph {
         v.w[c] = weights[c][v.id] / len[c];
       }
     });
+  }
+
+  template <class Functor>
+  void for_not_fixed(Functor func) {
+    for (Vertex& v : vertices) {
+      if (!v.fixed) {
+        func(v);
+      }
+    }
+
   }
 };
 
