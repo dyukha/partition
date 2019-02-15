@@ -33,7 +33,7 @@ struct Projections {
 
   static void simple(Graph& g, int depth) {
     int numBuckets = 1 << depth;
-    for (int c = 0; c < g.constraintsCount; ++c) {
+    for (int c = 0; c < (int)g.constraintsCount; ++c) {
       vector<double> sqr_len(numBuckets);
       vector<double> scalar_product(numBuckets);
       for (const Vertex& v : g.vertices) {
@@ -52,13 +52,14 @@ struct Projections {
   }
 
   static double getDif(Graph& g, double lam) {
-    return parallel_sum(g.vertices, [&](const Vertex& v) {return v.p - roundCube(v.p - lam);});
+    return parallel_sum(g.vertices, [&](const Vertex& v) {return v.w[0] * (v.p - roundCube(v.p - v.w[0] * lam));});
   }
 
   static void precise1D(Graph& g, int depth) {
+    assert(depth == 0);
     assert(g.constraintsCount == 1);
     double idealSum = 0; //- n * proportion + n * (1 - proportion);
-    double sum = parallel_sum(g.vertices, [](const Vertex &v) { return v.w[0] + v.p; });
+    double sum = parallel_sum(g.vertices, [](const Vertex &v) { return v.w[0] * v.p; });
     sum -= idealSum;
     double dif = getDif(g, 0);
     double lam;
@@ -68,7 +69,7 @@ struct Projections {
     if (abs(dif - sum) < imbalance * 1.01) {
       lam = 0;
     } else {
-      double maxMod = 1 + parallel_reduce<double>(g.vertices,
+      double maxMod = 10 + parallel_reduce<double>(g.vertices,
                                           [](const Vertex& v) {return abs(v.p);},
                                           [](double a, double b) {return max(a, b);});
       double left = dif < sum ? 0 : -maxMod-1;
@@ -77,7 +78,7 @@ struct Projections {
       for (int it = 0; it < 30; ++it) {
         double lam = (left + right) / 2;
         double dif = getDif(g, lam);
-        if (abs(dif - cmp) < imbalance * 0.01)
+        if (abs(dif - cmp) <= imbalance * 0.01)
           break;
         if (dif > cmp) {
           right = lam;
@@ -87,10 +88,11 @@ struct Projections {
       }
       lam = (left + right) / 2;
     }
-    parallel_for(g.vertices, [&](Vertex &v) { v.p = roundCube(v.p - lam); });
+    parallel_for(g.vertices, [&](Vertex &v) { v.p = roundCube(v.p - v.w[0] * lam); });
     // check
-    sum = parallel_sum(g.vertices, [](const Vertex &v) { return v.w[0] + v.p; });
-    assert(abs(sum - idealSum) < imbalance * 1.02);
+    sum = parallel_sum(g.vertices, [](const Vertex &v) { return v.w[0] * v.p; });
+    cerr << sum << endl;
+    assert(abs(sum - idealSum) <= imbalance * 1.02 + 1e-8);
   }
 
   static tuple<double, double> getDif2D(Graph& g, double lam1, double lam2) {
@@ -150,6 +152,7 @@ struct Projections {
 
   static void precise2D(Graph& g, int depth) {
     assert(g.constraintsCount == 2);
+    assert(depth == 0);
     double sum1, sum2;
     tie(sum1, sum2) = parallel_sum_tuple(g.vertices, [](const Vertex& v) {
       return make_tuple(v.w[0] * v.p, v.w[1] * v.p);
@@ -198,6 +201,7 @@ struct Projections {
   }
 
   static void dykstra(Graph& g, int depth) {
+    assert(depth == 0);
     int constraintsCount = g.constraintsCount;
     parallel_for(g.vertices, [&](Vertex& v) {
       for (int c = 0; c < constraintsCount; ++c) {
@@ -205,7 +209,7 @@ struct Projections {
       }
       v.incCube = 0;
     });
-    for (int it = 0; it < 5; ++it) {
+    for (int it = 0; it < 10; ++it) {
       for (int c = 0; c < constraintsCount; ++c) {
         double sum = parallel_sum(g.vertices, [&](Vertex &v) {
           v.p -= v.incPlane[c];

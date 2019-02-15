@@ -42,6 +42,10 @@
 #include <future>
 #include <thread>
 #include <sstream>
+#include "sys/types.h"
+#include "sys/sysinfo.h"
+#include <cstring>
+
 
 #include <chrono>
 #if defined(_WIN32)
@@ -281,4 +285,40 @@ template<typename T> T getMin(const vector<T>& vector) {
   return *min_element(begin(vector), end(vector));
 }
 
+struct sysinfo memInfo;
+
+int maxMemory = 0;
+
+int parseLineMem(char* line){
+  // This assumes that a digit will be found and the line ends in " Kb".
+  int i = strlen(line);
+  const char* p = line;
+  while (*p <'0' || *p > '9') p++;
+  line[i-3] = '\0';
+  i = atoi(p);
+  return i;
+}
+
+int getValueMem(){ //Note: this value is in KB!
+  FILE* file = fopen("/proc/self/status", "r");
+  int result = -1;
+  char line[128];
+
+  while (fgets(line, 128, file) != NULL){
+    if (strncmp(line, "VmRSS:", 6) == 0){
+      result = parseLineMem(line);
+      break;
+    }
+  }
+  fclose(file);
+  return result;
+}
+
+void updateMem() {
+  maxMemory = max(maxMemory, getValueMem());
+}
+
+void resetMem() {
+  maxMemory = 0;
+}
 #endif

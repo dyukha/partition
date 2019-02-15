@@ -73,7 +73,7 @@ struct Partition {
 
   bool check() {
     for(auto& p : part)
-      if (p.size() > upperBound || p.size() < lowerBound)
+      if ((int)p.size() > upperBound || (int)p.size() < lowerBound)
         return false;
     return true;
   }
@@ -90,17 +90,17 @@ struct Partition {
 
   void fixPartition() {
     for (int p = 0; p < k; p++) {
-      while (part[p].size() < lowerBound) {
+      while ((int)part[p].size() < lowerBound) {
         int j = 0;
-        while (part[j].size() <= lowerBound)
+        while ((int)part[j].size() <= lowerBound)
           j = Rand::next(k);
-        move(part[j][part[j].size() - 1], p);
+        move(part[j][(int)part[j].size() - 1], p);
       }
-      while (part[p].size() > upperBound) {
+      while ((int)part[p].size() > upperBound) {
         int j = 0;
-        while (part[j].size() >= upperBound)
+        while ((int)part[j].size() >= upperBound)
           j = Rand::next(k);
-        move(part[p][part[p].size() - 1], j);
+        move(part[p][(int)part[p].size() - 1], j);
       }
     }
   }

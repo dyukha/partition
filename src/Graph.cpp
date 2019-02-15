@@ -41,6 +41,8 @@ struct Vertex {
 //  double prevP; // for gradient descent - previous value of p (while checking that the value changed)
   vector<double> incPlane; // Increments for Dykstra projection. For each plane constraint.
   double incCube; // Increments for Dykstra projection. For cube constraint.
+  int64 dist2size;
+  double pagerank;
   int bucket; //Current vertex bucket
   bool fixed; // Is vertex fixed
 };
@@ -68,7 +70,7 @@ struct Graph {
   int edgeCount;
 
   Graph(int n, const vector<tuple<int, int>>& e) : n(n) {
-    edgeCount = e.size();
+    edgeCount = (int) e.size();
     vertices = vector<Vertex>(n);
     for (int i = 0; i < n; ++i) {
       vertices[i].id = i;
@@ -79,10 +81,43 @@ struct Graph {
       vertices[u].edges.push_back(v);
       vertices[v].edges.push_back(u);
     }
-    for (auto& v : vertices) {
-      v.degree = v.edges.size();
+    parallel_for(vertices, [&](Vertex &v) {
+      v.degree = (int) v.edges.size();
+    });
+    parallel_for(vertices, [&](Vertex &v) {
+      v.dist2size = 0;
+      for (int u : v.edges) {
+        v.dist2size += vertices[u].degree;
+      }
+    });
+    vector<vector<double>> pagerank(2, vector<double>(n, 1.0 / n));
+
+    int cur = 0;
+    for (int t = 0; t < 30; t++) {
+      vector<double>& other = pagerank[cur];
+      for (int u = 0; u < n; u++) {
+        if (vertices[u].degree != 0) {
+          other[u] /= vertices[u].degree;
+        } else {
+          other[u] = 0;
+        }
+      }
+      parallel_for(vertices, [&](Vertex &v) {
+        double& res = pagerank[1 - cur][v.id];
+        res = 0;
+        for (int u : v.edges) {
+          res += other[u];
+        }
+      });
+      cur = 1 - cur;
     }
+    parallel_for(vertices, [&](Vertex &v) {
+      v.pagerank = pagerank[cur][v.id];
+    });
+
+    cerr << "Finished calculating vertex data" << endl;
   }
+
 
   static ifstream prepareStream(const string &path) {
     ifstream in;
@@ -114,6 +149,7 @@ struct Graph {
     }
     in.close();
     cerr << "Graph is read. " << map.size() << " vertices, " << e.size() << " edges." << endl;
+    duplicateChecker.was.clear();
     Graph res = Graph(map.size(), e);
     return res;
   }
@@ -148,6 +184,7 @@ struct Graph {
     }
     in.close();
     cerr << "Graph is read. " << map.size() << " vertices, " << e.size() << " edges." << endl;
+    duplicateChecker.was.clear();
     Graph res = Graph(static_cast<int>(map.size()), e);
     return res;
   }
@@ -157,8 +194,8 @@ struct Graph {
     vector<double> len(constraintsCount);
     vector<double> sum(constraintsCount);
     imbalance = vector<double>(constraintsCount);
-    for (int c = 0; c < constraintsCount; ++c) {
-      assert(n == weights[c].size());
+    for (int c = 0; c < (int)constraintsCount; ++c) {
+      assert(n == (int)weights[c].size());
       double sqLen = 0;
       for (int i = 0; i < n; ++i) {
         double w = weights[c][i];
@@ -172,7 +209,7 @@ struct Graph {
     parallel_for(vertices, [&](Vertex& v) {
       v.incPlane = vector<double>(constraintsCount);
       v.w = vector<double>(constraintsCount);
-      for (int c = 0; c < constraintsCount; ++c) {
+      for (int c = 0; c < (int)constraintsCount; ++c) {
         v.w[c] = weights[c][v.id] / len[c];
       }
     });

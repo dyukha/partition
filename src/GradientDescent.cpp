@@ -32,9 +32,7 @@ class GradientDescent {
 public:
   /// Partition graph g with imbalance eps.
   /// Can split into not-equal sizes, as defined by proportion parameter.
-  Partition apply(Graph &g, const vector<vector<double>> weights, double finalEps, int totalDepth) {
-    bool fix = true;
-    bool adapt = true;
+  Partition apply(Graph &g, const vector<vector<double>> weights, double finalEps, int totalDepth, bool adapt = true, bool fix = true) {
     // In the worst case imbalance on each step is multiplied
     // (1+eps)^depth <= 1+finalEps   <=>    eps <= (1+finalEps)^(1/depth) - 1
     double eps = pow(1 + finalEps, 1.0 / totalDepth) - 1;
@@ -47,21 +45,48 @@ public:
     for (int depth = 0; depth < totalDepth; ++depth) {
       for (auto &v : g.vertices) {
         v.p = v.last_p = 0.01 * 2 * (Rand::nextRand() - 1);
-        v.grad = 0;
         v.fixed = false;
       }
-      project(g, depth);
+      double val = 0.2;
+      g.vertices[0].p = val;
+      g.vertices[1].p = -val;
+      g.vertices[2].p = val;
+      g.vertices[3].p = -val;
+
+//      project(g, depth);
+      parallel_for(g.vertices, [&](Vertex &v) {
+        v.grad = 0;
+        for (int u : v.edges) {
+          v.grad += g.vertices[u].p;
+        }
+      });
       int numBuckets = 1 << depth;
       vector<double> coefs(numBuckets);
       for (int bucket = 0; bucket < numBuckets; ++bucket) {
         coefs[bucket] = 1;
       }
 
+      cerr << "Weights: ";
+      for (auto& v : g.vertices) {
+        cerr << v.w[0] << " ";
+      }
+      cerr << endl;
       double allowedImbalance = eps / pow(2, totalDepth - depth - 1);
       for (int iter = 0; iter < 101; iter++) {
-        if (iter % 3 == 0) {
-          printStats(g, "Iteration " + my_to_string(iter), depth, coefs);
+//        if (iter % 3 == 0) {
+//          printStats(g, "Iteration " + my_to_string(iter), depth, coefs);
+//        }
+        cerr << "Iteration " << iter << endl;
+        cerr << "Values: ";
+        for (auto& v : g.vertices) {
+          cerr << v.p << " ";
         }
+        cerr << endl;
+        cerr << "Gradient: ";
+        for (auto& v : g.vertices) {
+          cerr << v.grad << " ";
+        }
+        cerr << endl;
         computeGradient(g);
         double stepSize = adapt ? step(iter) * sqrt(n >> depth) : step(iter);
         parallel_for(g.vertices, [](Vertex &v) {
@@ -80,12 +105,17 @@ public:
             v.p += v.grad * stepSize  * (adapt ? coefs[v.bucket] / len[v.bucket] : 1);
           }
         });
-        if (getMax(imbalance(g, depth)) > allowedImbalance) {
-          project(g, depth);
-          if (iter > 80) {
-            project(g, depth);
-          }
+        cerr << "After gradient step: ";
+        for (auto& v : g.vertices) {
+          cerr << v.grad << " ";
         }
+        cerr << endl;
+        project(g, depth);
+        project(g, depth);
+        //if (getMax(imbalance(g, depth)) > allowedImbalance) {
+        //  if (iter > 80) {
+        //  }
+        //}
         vector<double> dif(numBuckets);
         g.for_not_fixed([&](Vertex& v) {
           dif[v.bucket] += (v.p - v.prev_p) * (v.p - v.prev_p);
@@ -106,6 +136,9 @@ public:
         }
       }
       cerr << "Allowed imbalance: " << allowedImbalance << endl;
+      for (Vertex& v : g.vertices) {
+        v.fixed = false;
+      }
       for (int t = 0; t < 10; ++t) {
         project(g, depth);
       }
@@ -165,9 +198,10 @@ protected:
 
 private:
   vector<double> imbalance(const Graph &g, int depth) {
+    updateMem();
     int bucketCount = 1 << (depth + 1);
     vector<double> res(g.constraintsCount);
-    for (int c = 0; c < g.constraintsCount; ++c) {
+    for (int c = 0; c < (int)g.constraintsCount; ++c) {
       vector<double> imb(bucketCount);
       double sum = 0;
       for (const Vertex &v : g.vertices) {
